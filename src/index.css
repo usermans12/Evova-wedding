@@ -1,0 +1,145 @@
+@import "./fonts/fonts.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Poppins", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --font-cinzel: "Cinzel", serif;
+  --font-script: "Great Vibes", "Parisienne", cursive;
+
+  --color-primary-50: #f4f8fa;
+  --color-primary-100: #e6f0f5;
+  --color-primary-200: #cedfec;
+  --color-primary-300: #a9c7dd;
+  --color-primary-400: #7ba4c0;
+  --color-primary-500: #5582a2;
+  --color-primary-600: #426987;
+  --color-primary-700: #37566e;
+  --color-primary-800: #30495d;
+  --color-primary-950: #1a2935;
+
+  --animate-spin-slow: spin 12s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-fade-in-up: fadeInUp 0.8s ease-out forwards;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slowZoom {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-slow-zoom {
+  animation: slowZoom 24s ease-in-out infinite;
+}
+
+/* Custom Scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f4f8fa;
+}
+::-webkit-scrollbar-thumb {
+  background: #a9c7dd;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7ba4c0;
+}
+
+/* Base style resets */
+body {
+  font-family: var(--font-sans);
+  background-color: #f8fafc;
+  color: #1e293b;
+  overflow-x: hidden;
+}
+
+/* Watercolor Hydrangea soft spots */
+.watercolor-bg-spot {
+  background: radial-gradient(circle, rgba(206, 223, 236, 0.4) 0%, rgba(244, 248, 250, 0) 70%);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.watercolor-bg-pink {
+  background: radial-gradient(circle, rgba(206, 223, 236, 0.2) 0%, rgba(253, 244, 245, 0) 70%);
+  filter: blur(50px);
+  pointer-events: none;
+}
+
+/* Falling petal animation and styles */
+@keyframes fall {
+  0% {
+    transform: translateY(-5vh) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(105vh) translateX(100px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-petal {
+  position: fixed;
+  top: -10px;
+  pointer-events: none;
+  z-index: 30;
+  animation: fall linear infinite;
+}
+
+/* Elegant gold ornament borders and text effects */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #b89150 0%, #ecd49a 50%, #b89150 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-border {
+  border-image: linear-gradient(135deg, #b89150, #ecd49a, #b89150) 1;
+}
+
+/* Equalizer audio bar height pulse animation */
+@keyframes eqHeight {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+.eq-bar-1 { animation: eqHeight 0.9s ease-in-out infinite alternate; }
+.eq-bar-2 { animation: eqHeight 0.6s ease-in-out infinite alternate; }
+.eq-bar-3 { animation: eqHeight 0.8s ease-in-out infinite alternate; }
+.eq-bar-4 { animation: eqHeight 0.5s ease-in-out infinite alternate; }
+

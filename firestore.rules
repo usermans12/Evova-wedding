@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Secure, high-performing check using Firebase verified email token
+    function isSuperadmin() {
+      return isSignedIn() && 
+             request.auth.token != null && 
+             request.auth.token.email != null && 
+             request.auth.token.email.toLowerCase() == "evova.official@gmail.com";
+    }
+
+    // -- Users collection --
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) || isSuperadmin();
+    }
+
+    // -- Clients collection --
+    match /clients/{clientId} {
+      allow read: if true;
+      allow write: if isSuperadmin() || isOwner(clientId);
+
+      // Subcollection: Wishes
+      match /wishes/{wishId} {
+        allow read: if true;
+        allow write: if true; // Guests can write wishes/RSVPs
+      }
+    }
+
+    // -- Templates collection --
+    match /templates/{templateId} {
+      allow read: if true;
+      allow write: if isSuperadmin();
+    }
+
+    // -- Settings collection --
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow write: if isSuperadmin();
+    }
+
+    // -- Logs collection --
+    match /logs/{logId} {
+      allow read: if isSuperadmin();
+      allow write: if true; // App-wide logs can be appended by any user action
+    }
+
+    // -- Storage collection --
+    match /storage/{fileId} {
+      allow read: if true;
+      allow write: if isSuperadmin() || isSignedIn();
+    }
+
+    // -- Test connection path --
+    match /test/{testId} {
+      allow read: if true;
+    }
+  }
+}

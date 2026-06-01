@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "user": {
+      "title": "User Profile",
+      "description": "User account containing their auth uid, full name, email address, role, and optional linked clientId",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Auth UID" },
+        "name": { "type": "string", "description": "Full display name" },
+        "email": { "type": "string", "description": "Email address" },
+        "role": { "type": "string", "enum": ["superadmin", "client"], "description": "User permission role" },
+        "clientId": { "type": "string", "description": "Linked client account document ID if they are a client" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "client": {
+      "title": "Client Wedding Account",
+      "description": "Pristine digital wedding invitation configurations for a couple",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Client document unique identifier" },
+        "name": { "type": "string", "description": "Display name" },
+        "username": { "type": "string", "description": "Log username" },
+        "email": { "type": "string", "description": "Contact email" },
+        "password": { "type": "string", "description": "Sandi pembuka fallback" },
+        "status": { "type": "string", "enum": ["active", "suspended", "inactive"], "description": "Status of invitation" },
+        "slug": { "type": "string", "description": "Unique URL routing key" },
+        "visibility": { "type": "string", "enum": ["public", "private", "suspended"], "description": "SEO visibility setting" },
+        "keepWeddingPublic": { "type": "boolean", "description": "Keep wedding details public" },
+        "createdAt": { "type": "string", "description": "Creation timestamp in ID locale" }
+      },
+      "required": ["id", "name", "username", "email", "status", "slug"]
+    },
+    "wish": {
+      "title": "Guest RSVPs and Wishes",
+      "description": "Dynamic heartfelt wishes and RSVPs posted by wedding guests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Wish identifier" },
+        "name": { "type": "string", "description": "Guest name" },
+        "wish": { "type": "string", "description": "Expression of support" },
+        "attendance": { "type": "string", "enum": ["Hadir", "Tidak Hadir", "Ragu-ragu"], "description": "Attendance option selected" },
+        "createdAt": { "type": "string", "description": "Submission timestamp" }
+      },
+      "required": ["id", "name", "wish", "attendance", "createdAt"]
+    },
+    "template": {
+      "title": "Template Preset",
+      "description": "Thematic pre-stylings list",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "theme": { "type": "string" },
+        "description": { "type": "string" },
+        "isPremium": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "accentClass": { "type": "string" },
+        "bgClass": { "type": "string" },
+        "textColor": { "type": "string" },
+        "iconColor": { "type": "string" }
+      },
+      "required": ["id", "name", "theme", "description"]
+    },
+    "settings": {
+      "title": "Global Feature Toggles",
+      "description": "Global administration capability feature control flags",
+      "type": "object",
+      "properties": {
+        "rsvp": { "type": "boolean" },
+        "guestbook": { "type": "boolean" },
+        "gallery": { "type": "boolean" },
+        "music": { "type": "boolean" },
+        "countdown": { "type": "boolean" },
+        "loveStory": { "type": "boolean" },
+        "giftDigital": { "type": "boolean" },
+        "googleMaps": { "type": "boolean" },
+        "animationPremium": { "type": "boolean" },
+        "exportJson": { "type": "boolean" },
+        "uploadVideo": { "type": "boolean" },
+        "floatingMusic: ": { "type": "boolean" },
+        "watermark": { "type": "boolean" },
+        "analytics": { "type": "boolean" }
+      },
+      "required": ["rsvp", "guestbook", "gallery", "music"]
+    },
+    "log": {
+      "title": "Activity Audit Log",
+      "description": "Security audit log tracking and monitoring platform actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "userName": { "type": "string" },
+        "activity": { "type": "string" },
+        "status": { "type": "string", "enum": ["SUKSES", "GAGAL", "INFO"] },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "userName", "activity", "status", "description"]
+    },
+    "storage": {
+      "title": "Cloud Storage File Metadata",
+      "description": "Files uploaded or hosted for couple invitations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "uploadDate": { "type": "string" },
+        "fileType": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "required": ["id", "fileName", "fileSize", "uploadDate", "fileType", "url"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "user",
+      "description": "Private profile of registered users containing role assignments (superadmin/client)"
+    },
+    "clients/{clientId}": {
+      "schema": "client",
+      "description": "Client wedding invitation details and couples metadata"
+    },
+    "clients/{clientId}/wishes/{wishId}": {
+      "schema": "wish",
+      "description": "Wishes and RSVPs sent by digital invitation web visitors"
+    },
+    "templates/{templateId}": {
+      "schema": "template",
+      "description": "Thematic pre-stylings configurations list"
+    },
+    "settings/global": {
+      "schema": "settings",
+      "description": "Application administration features enablement toggles"
+    },
+    "logs/{logId}": {
+      "schema": "log",
+      "description": "Platform audit logging journal"
+    },
+    "storage/{fileId}": {
+      "schema": "storage",
+      "description": "Metadata of pictures, audios, and QRIS codes hosted"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "EVOVA WEDDING DIGITAL",
+  "description": "Platform pembuatan undangan pernikahan digital mewah interaktif dengan fitur live RSVP, album galeri, kisah cinta, musik latar, dan kustomisasi penuh.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

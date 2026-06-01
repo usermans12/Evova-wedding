@@ -1,0 +1,227 @@
+/* ==========================================================================
+   OFFLINE NATIVE FONTS STACK DEFINITIONS (0ms LATENCY)
+   Map all required Google Fonts to local native device premium fonts families.
+   ========================================================================== */
+
+/* 1. CINZEL DECORATIVE & CINZEL (Imperial Royal Theme Fonts) */
+@font-face {
+  font-family: 'Cinzel Decorative';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Cinzel Decorative'), local('Cinzel-Decorative'), local('Cinzel'), local('Times New Roman'), local('Georgia'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel Decorative';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Cinzel Decorative Bold'), local('Cinzel-Decorative-Bold'), local('Cinzel Bold'), local('Times New Roman Bold'), local('Georgia Bold'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Cinzel'), local('Cinzel-Regular'), local('Georgia'), local('Times New Roman'), local('Baskerville'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Cinzel Bold'), local('Cinzel-Bold'), local('Georgia Bold'), local('Times New Roman Bold'), local('Baskerville Bold'), local('serif');
+  font-display: swap;
+}
+
+
+/* 2. CORMORANT GARAMOND & PLAYFAIR DISPLAY (Traditional, Javanese & Sage Garden Fonts) */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 300;
+  src: local('Cormorant Garamond Light'), local('Cormorant-Garamond-Light'), local('Garamond'), local('Georgia'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Cormorant Garamond'), local('Cormorant-Garamond'), local('Garamond'), local('Georgia'), local('Times New Roman'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-weight: 400;
+  src: local('Cormorant Garamond Italic'), local('Cormorant-Garamond-Italic'), local('Garamond Italic'), local('Georgia Italic'), local('Times New Roman Italic'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Playfair Display'), local('Playfair-Display'), local('Georgia'), local('Times New Roman'), local('Palatino'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400;
+  src: local('Playfair Display Italic'), local('Playfair-Display-Italic'), local('Georgia Italic'), local('Times New Roman Italic'), local('serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Playfair Display Bold'), local('Playfair-Display-Bold'), local('Georgia Bold'), local('Times New Roman Bold'), local('Palatino Bold'), local('serif');
+  font-display: swap;
+}
+
+
+/* 3. SANS-SERIF MODERN LAYOUTS (Poppins, Inter, Lato, Montserrat, Nunito, Open Sans) */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 300;
+  src: local('Poppins Light'), local('Poppins-Light'), local('Inter Light'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Poppins'), local('Poppins-Regular'), local('Inter'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  src: local('Poppins Medium'), local('Poppins-Medium'), local('Inter Medium'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  src: local('Poppins SemiBold'), local('Poppins-SemiBold'), local('Inter SemiBold'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Poppins Bold'), local('Poppins-Bold'), local('Inter Bold'), local('Helvetica Neue Bold'), local('Arial Bold'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300;
+  src: local('Inter Light'), local('Inter-Light'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Inter'), local('Inter-Regular'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  src: local('Inter Medium'), local('Inter-Medium'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Inter Bold'), local('Inter-Bold'), local('Helvetica Neue Bold'), local('Arial Bold'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Montserrat'), local('Montserrat-Regular'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Lato'), local('Lato-Regular'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Nunito'), local('Nunito-Regular'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('Open-Sans'), local('Helvetica Neue'), local('Arial'), local('sans-serif');
+  font-display: swap;
+}
+
+
+/* 4. SCRIPT & CALLIGRAPHY (Great Vibes, Parisienne, Allura, Pinyon Script) */
+@font-face {
+  font-family: 'Great Vibes';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Great Vibes'), local('GreatVibes'), local('SignPainter-HouseScript'), local('SignPainter'), local('Brush Script MT'), local('Savoye LET'), local('Zapfino'), local('cursive');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Parisienne';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Parisienne'), local('Parisienne-Regular'), local('SignPainter-HouseScript'), local('SignPainter'), local('Brush Script MT'), local('Savoye LET'), local('Zapfino'), local('cursive');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Allura';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Allura'), local('Allura-Regular'), local('SignPainter-HouseScript'), local('SignPainter'), local('Brush Script MT'), local('Savoye LET'), local('Zapfino'), local('cursive');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Pinyon Script';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Pinyon Script'), local('Pinyon-Script'), local('SignPainter-HouseScript'), local('SignPainter'), local('Brush Script MT'), local('Savoye LET'), local('Zapfino'), local('cursive');
+  font-display: swap;
+}
