@@ -96,6 +96,7 @@ export default function App() {
   // Active Client Login State
   const [loggedClient, setLoggedClient] = useState<ClientAccount | null>(null);
   const [isClientsLoading, setIsClientsLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Activity Log Writer
   const addLog = (userName: string, activity: string, status: "SUKSES" | "GAGAL" | "INFO", description: string) => {
@@ -238,9 +239,10 @@ export default function App() {
   useEffect(() => {
     // A. Keep track of Auth state transitions
     const unsubscribeAuth = auth.onAuthStateChanged(async (fbUser) => {
-      if (fbUser) {
-        setCurrentUser(fbUser);
-        try {
+      setAuthLoading(true);
+      try {
+        if (fbUser) {
+          setCurrentUser(fbUser);
           const userDocRef = doc(db, "users", fbUser.uid);
           const userDoc = await getDoc(userDocRef);
           
@@ -283,7 +285,11 @@ export default function App() {
             const clientDocRef = doc(db, "clients", targetClientId);
             const clientDoc = await getDoc(clientDocRef);
             if (clientDoc.exists()) {
-              setLoggedClient(clientDoc.data() as ClientAccount);
+              const clientDataFetched = clientDoc.data() as ClientAccount;
+              if (!clientDataFetched.data) {
+                clientDataFetched.data = { ...defaultWeddingData };
+              }
+              setLoggedClient(clientDataFetched);
               setActiveTab("client-admin");
               setShowLoginModal(false);
             } else {
@@ -314,17 +320,19 @@ export default function App() {
               setShowLoginModal(false);
             }
           }
-        } catch (err) {
-          console.error("Gagal memuat profil auth:", err);
+        } else {
+          setCurrentUser(null);
+          setUserProfile(null);
+          setIsSuperadminUnlocked(false);
+          setLoggedClient(null);
+          if (!isGuestView && activeTab !== "wedding-preview") {
+            setActiveTab("landing");
+          }
         }
-      } else {
-        setCurrentUser(null);
-        setUserProfile(null);
-        setIsSuperadminUnlocked(false);
-        setLoggedClient(null);
-        if (!isGuestView && activeTab !== "wedding-preview") {
-          setActiveTab("landing");
-        }
+      } catch (err) {
+        console.error("Gagal memuat profil auth:", err);
+      } finally {
+        setAuthLoading(false);
       }
     });
 
@@ -592,6 +600,7 @@ export default function App() {
     setSaLoginError("");
     addLog("SUPERADMIN", "Logout Admin", "INFO", "Pemilik mendeaktivasi kredensial panel Superadmin.");
     setActiveTab("landing");
+    signOut(auth).catch(console.error);
     if (typeof window !== "undefined") {
       window.history.pushState({}, "", "/");
     }
@@ -672,6 +681,7 @@ export default function App() {
       sessionStorage.removeItem("wedding_client_session_id");
       localStorage.removeItem("wedding_client_session_id");
       setActiveTab("landing");
+      signOut(auth).catch(console.error);
       if (typeof window !== "undefined") {
         window.history.pushState({}, "", "/");
       }
@@ -696,6 +706,21 @@ export default function App() {
 
     return defaultWeddingData;
   };
+
+  // Global auth credentials checking loader to prevent content flash
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-800 font-sans">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-rose-50 border border-rose-150 rounded-full flex items-center justify-center mx-auto text-rose-500 shadow-sm animate-bounce">
+            <Heart className="w-6 h-6 fill-rose-300 stroke-rose-600" />
+          </div>
+          <h2 className="font-serif font-black text-rose-800 tracking-wide uppercase text-sm animate-pulse">Menghubungkan Sesi Editor...</h2>
+          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-mono">Memuat Kredensial Keamanan</p>
+        </div>
+      </div>
+    );
+  }
 
   // Render pristine, standalone iframe Guest invitation page
   if (isGuestView) {

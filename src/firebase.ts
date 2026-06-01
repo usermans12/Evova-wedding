@@ -48,7 +48,7 @@ let isSigningIn = false;
 
 // Initialize auth state listener
 export const initAuth = (
-  onAuthSuccess?: (user: any, token: string) => void,
+  onAuthSuccess?: (user: any, token: string | null) => void,
   onAuthFailure?: () => void
 ) => {
   return auth.onAuthStateChanged(async (user) => {
@@ -56,11 +56,9 @@ export const initAuth = (
       if (!cachedAccessToken) {
         cachedAccessToken = localStorage.getItem("google_access_token");
       }
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        // Attempt to fetch from memory or prompt
-        if (onAuthFailure) onAuthFailure();
+      // Decouple main app session success from active google token
+      if (onAuthSuccess) {
+        onAuthSuccess(user, cachedAccessToken);
       }
     } else {
       cachedAccessToken = null;
@@ -76,14 +74,22 @@ export const googleSignIn = async () => {
     isSigningIn = true;
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error("Gagal memperoleh token akses untuk API Google");
+    const token = credential?.accessToken || null;
+    if (token) {
+      cachedAccessToken = token;
+      localStorage.setItem("google_access_token", token);
     }
-    cachedAccessToken = credential.accessToken;
-    localStorage.setItem("google_access_token", cachedAccessToken);
-    return { user: result.user, accessToken: cachedAccessToken };
-  } catch (err) {
+    return { user: result.user, accessToken: token };
+  } catch (err: any) {
     console.error("Kesalahan masuk dengan akun Google:", err);
+    // Explicit clean popup closed warnings and COOP policy restrictions
+    if (err.code === "auth/popup-closed-by-user") {
+      console.warn("Popup ditutup oleh pengguna.");
+    } else if (err.code === "auth/cancelled-popup-request") {
+      console.warn("Permintaan popup dibatalkan.");
+    } else if (err.message && err.message.includes("Cross-Origin-Opener-Policy")) {
+      console.warn("Kebijakan Cross-Origin-Opener-Policy memblokir popup.");
+    }
     throw err;
   } finally {
     isSigningIn = false;
@@ -98,7 +104,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 export const googleLogout = async () => {
-  await signOut(auth);
+  // Disconnect Google token from cached persistence without breaking Firebase session
   cachedAccessToken = null;
   localStorage.removeItem("google_access_token");
 };
