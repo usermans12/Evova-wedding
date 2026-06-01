@@ -692,7 +692,7 @@ export default function App() {
     
     // Fallback to active preview selection dropdown
     const matched = clients.find(c => c.id === selectedPreviewClientId);
-    if (matched) return matched.data;
+    if (matched) return matched.data || defaultWeddingData;
 
     return defaultWeddingData;
   };

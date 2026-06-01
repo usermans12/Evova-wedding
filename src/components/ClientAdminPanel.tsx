@@ -4,7 +4,7 @@ import { WeddingData, ClientAccount, TemplatePreset, GuestWish } from "../types"
 import { 
   ShieldAlert, LogIn, Lock, LogOut, FileText, CheckCircle, 
   MessageSquare, Trash2, Eye, HelpCircle, Heart, User, Clipboard, Check,
-  Cloud, Users, Share2, Search, ArrowRight, Sparkles, Database
+  Cloud, Users, Share2, Search, ArrowRight, Sparkles, Database, RefreshCw
 } from "lucide-react";
 import { safeLocalStorage } from "../utils";
 import { 
@@ -18,6 +18,7 @@ import {
   exportRSVPsToGoogleSheets, backupWeddingToGoogleDrive, 
   fetchGoogleContacts, ImportableContact 
 } from "../google-api";
+import { defaultWeddingData } from "../data";
 
 interface ClientAdminPanelProps {
   clientAccounts: ClientAccount[];
@@ -39,6 +40,7 @@ export default function ClientAdminPanel({
   onLogout
 }: ClientAdminPanelProps) {
   const activeClient = loggedClient;
+  const clientData = activeClient?.data || defaultWeddingData;
   
   // Moderate wishes states
   const [wishes, setWishes] = useState<GuestWish[]>([]);
@@ -123,8 +125,8 @@ export default function ClientAdminPanel({
 
   const getShareText = () => {
     if (!activeClient) return "";
-    const groomNick = activeClient.data.groomNick || activeClient.name;
-    const brideNick = activeClient.data.brideNick || "Pasangan";
+    const groomNick = clientData?.groomNick || activeClient.name;
+    const brideNick = clientData?.brideNick || "Pasangan";
     return `Mohon doa restu di pernikahan suci kami: ${groomNick} & ${brideNick}. Selengkapnya di undangan digital premium kami: ${getShareUrl()}`;
   };
 
@@ -190,8 +192,8 @@ export default function ClientAdminPanel({
       setGoogleSuccessAlert(null);
       const res = await exportRSVPsToGoogleSheets(
         googleToken,
-        activeClient.data.groomName,
-        activeClient.data.brideName,
+        clientData?.groomName || "Pengantin Pria",
+        clientData?.brideName || "Pasangan",
         wishes
       );
       setSheetLink(res.spreadsheetUrl);
@@ -210,8 +212,8 @@ export default function ClientAdminPanel({
       setGoogleSuccessAlert(null);
       const res = await backupWeddingToGoogleDrive(
         googleToken,
-        activeClient.data.groomName,
-        activeClient.data
+        clientData?.groomName || "Pengantin Pria",
+        clientData
       );
       setDriveLink(res.webViewLink);
       setGoogleSuccessAlert("Pencadangan berhasil! Draf mentah JSON aman tersimpan di Google Drive Anda.");
@@ -247,7 +249,7 @@ export default function ClientAdminPanel({
     const newWishes: GuestWish[] = selectedContacts.map((contact, index) => ({
       id: "w_c_" + Date.now() + "_" + index,
       name: contact.name,
-      wish: `Halo ${activeClient.data.groomNick || "Pengantin"} & ${activeClient.data.brideNick || "Pengantin"}! Selamat menempuh hidup baru ya. Semoga bahagia selalu. (Kontak Google)`,
+      wish: `Halo ${clientData?.groomNick || "Pengantin"} & ${clientData?.brideNick || "Pengantin"}! Selamat menempuh hidup baru ya. Semoga bahagia selalu. (Kontak Google)`,
       attendance: "Hadir",
       createdAt: new Date().toISOString().slice(0, 16).replace("T", " ")
     }));
@@ -297,7 +299,7 @@ export default function ClientAdminPanel({
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const groomNick = activeClient.data.groomNick || activeClient.data.groomName || "wedding";
+    const groomNick = clientData?.groomNick || clientData?.groomName || "wedding";
     link.href = url;
     link.download = `daftar_tamu_rsvp_${groomNick.toLowerCase().replace(/\s+/g, "_")}.csv`;
     link.style.display = "none";
@@ -360,7 +362,7 @@ export default function ClientAdminPanel({
         <div className="flex flex-wrap gap-2">
           {/* Preview Button */}
           <button
-            onClick={() => onPreviewClick(activeClient.data)}
+            onClick={() => onPreviewClick(clientData)}
             className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-150 text-rose-700 rounded-xl text-xs font-semibold cursor-pointer transition"
           >
             <Eye className="w-3.5 h-3.5" />
@@ -428,9 +430,9 @@ export default function ClientAdminPanel({
         {/* Left Side (8 units width): Edit wedding details Form */}
         <div className="lg:col-span-8">
           <FormGenerator 
-            data={activeClient.data}
+            data={clientData}
             onChange={handleDataChange}
-            onPreviewClick={() => onPreviewClick(activeClient.data)}
+            onPreviewClick={() => onPreviewClick(clientData)}
             isClientOnly={true}
             activeTemplates={activeTemplates}
             onUploadFileToStorage={onUploadFileToStorage}

@@ -42,8 +42,8 @@ googleProvider.addScope("https://www.googleapis.com/auth/drive.file");
 googleProvider.addScope("https://www.googleapis.com/auth/contacts");
 googleProvider.addScope("https://www.googleapis.com/auth/spreadsheets");
 
-// Caching access token in memory
-let cachedAccessToken: string | null = null;
+// Caching access token in memory & localStorage backup
+let cachedAccessToken: string | null = localStorage.getItem("google_access_token");
 let isSigningIn = false;
 
 // Initialize auth state listener
@@ -53,6 +53,9 @@ export const initAuth = (
 ) => {
   return auth.onAuthStateChanged(async (user) => {
     if (user) {
+      if (!cachedAccessToken) {
+        cachedAccessToken = localStorage.getItem("google_access_token");
+      }
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
@@ -61,6 +64,7 @@ export const initAuth = (
       }
     } else {
       cachedAccessToken = null;
+      localStorage.removeItem("google_access_token");
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -76,6 +80,7 @@ export const googleSignIn = async () => {
       throw new Error("Gagal memperoleh token akses untuk API Google");
     }
     cachedAccessToken = credential.accessToken;
+    localStorage.setItem("google_access_token", cachedAccessToken);
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (err) {
     console.error("Kesalahan masuk dengan akun Google:", err);
@@ -86,12 +91,16 @@ export const googleSignIn = async () => {
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
+  if (!cachedAccessToken) {
+    cachedAccessToken = localStorage.getItem("google_access_token");
+  }
   return cachedAccessToken;
 };
 
 export const googleLogout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  localStorage.removeItem("google_access_token");
 };
 
 // Firebase Integration error-handling requirement
