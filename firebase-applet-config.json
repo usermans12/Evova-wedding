@@ -1,10 +1,10 @@
 {
-  "projectId": "evova-studio",
-  "appId": "1:752535163263:web:8674bc3396017136e6ca4a",
-  "apiKey": "AIzaSyDHJWqdsqsoR58qXcCYKce5HeQAhsL_9cA",
-  "authDomain": "evova-studio.firebaseapp.com",
+  "projectId": "evova-wedding",
+  "appId": "1:396728459936:web:de3fe2e340d12f32aa9fc5",
+  "apiKey": "AIzaSyAfA5YBG1l2mHZbF32RnmpmK6ZoBfQydFE",
+  "authDomain": "evova-wedding.firebaseapp.com",
   "firestoreDatabaseId": "(default)",
-  "storageBucket": "evova-studio.firebasestorage.app",
-  "messagingSenderId": "752535163263",
-  "measurementId": "G-RPQ7WHTTB8"
+  "storageBucket": "evova-wedding.firebasestorage.app",
+  "messagingSenderId": "396728459936",
+  "measurementId": "G-YDCYSRM2ZF"
 }

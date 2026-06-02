@@ -243,9 +243,8 @@ export default function App() {
     }
   }, []);
 
-  // 2. Real-time synchronization from Cloud Firestore & Firebase Auth status listener
+  // 2. A. Firebase Auth status listener (Runs once on mount)
   useEffect(() => {
-    // A. Keep track of Auth state transitions
     const unsubscribeAuth = auth.onAuthStateChanged(async (fbUser) => {
       setAuthLoading(true);
       try {
@@ -253,14 +252,12 @@ export default function App() {
           setCurrentUser(fbUser);
           const userDocRef = doc(db, "users", fbUser.uid);
           
-          // Give Firestore SDK 200ms to synchronize its authentication state with Firebase Auth
           await new Promise((resolve) => setTimeout(resolve, 200));
           
           let userDoc;
           try {
             userDoc = await getDoc(userDocRef);
           } catch (err) {
-            // Retry fetching with 500ms delay to handle active token propagation race condition in sandbox/iframes
             try {
               await new Promise((resolve) => setTimeout(resolve, 500));
               userDoc = await getDoc(userDocRef);
@@ -340,7 +337,7 @@ export default function App() {
                 username: (fbUser.email || "").split("@")[0] || "klien",
                 email: fbUser.email || "",
                 status: "active",
-                slug: getUniqueSlug(generateSlug(cleanName, "undangan"), clients),
+                slug: generateSlug(cleanName, "undangan"),
                 visibility: "public",
                 keepWeddingPublic: true,
                 createdAt: new Date().toLocaleDateString("id-ID", {
@@ -370,9 +367,6 @@ export default function App() {
           setUserProfile(null);
           setIsSuperadminUnlocked(false);
           setLoggedClient(null);
-          if (!isGuestView && activeTab !== "wedding-preview") {
-            setActiveTab("landing");
-          }
         }
       } catch (err) {
         console.error("Gagal memuat profil auth:", err);
@@ -381,7 +375,11 @@ export default function App() {
       }
     });
 
-    // B. Real-time synchronization for Clients list
+    return () => unsubscribeAuth();
+  }, []);
+
+  // 2. B. Real-time synchronization for Clients list
+  useEffect(() => {
     const unsubscribeClients = onSnapshot(collection(db, "clients"), (snap) => {
       const list: ClientAccount[] = [];
       snap.forEach((docSnap) => {
@@ -396,8 +394,11 @@ export default function App() {
       console.warn("Gagal sinkronisasi klien secara real-time:", err.message);
       setIsClientsLoading(false);
     });
+    return () => unsubscribeClients();
+  }, []);
 
-    // C. Real-time synchronization for Layout Templates
+  // 2. C. Real-time synchronization for Layout Templates
+  useEffect(() => {
     const unsubscribeTemplates = onSnapshot(collection(db, "templates"), (snap) => {
       const list: TemplatePreset[] = [];
       snap.forEach((docSnap) => {
@@ -414,57 +415,72 @@ export default function App() {
     }, (err) => {
       console.warn("Sinkroniasi template ditangguhkan:", err.message);
     });
+    return () => unsubscribeTemplates();
+  }, []);
 
-    // D. Real-time synchronization for Global settings / toggles
+  // 2. D. Real-time synchronization for Global settings / toggles
+  useEffect(() => {
     const unsubscribeSettings = onSnapshot(doc(db, "settings", "global"), (snap) => {
       if (snap.exists()) {
         setFeatureToggles(snap.data() as GlobalFeatureToggles);
       } else {
-        setDoc(doc(db, "settings", "global"), featureToggles).catch(console.error);
+        setDoc(doc(db, "settings", "global"), {
+          rsvp: true,
+          guestbook: true,
+          gallery: true,
+          music: true,
+          countdown: true,
+          loveStory: true,
+          giftDigital: true,
+          googleMaps: true,
+          animationPremium: true,
+          exportJson: true,
+          uploadVideo: true,
+          floatingMusic: true,
+          watermark: false,
+          analytics: true
+        }).catch(console.error);
       }
     }, (err) => {
       console.warn("Sinkroniasi settings ditangguhkan:", err.message);
     });
+    return () => unsubscribeSettings();
+  }, []);
 
-    // E. Real-time synchronization for Logs collection
-    let unsubscribeLogs = () => {};
-    const isCurrentUserSuperadmin = (currentUser?.email && currentUser.email.toLowerCase() === "evova.official@gmail.com") || (userProfile?.role === "superadmin") || isSuperadminUnlocked;
-    if (isCurrentUserSuperadmin) {
-      unsubscribeLogs = onSnapshot(collection(db, "logs"), (snap) => {
-        const list: ActivityLogEntry[] = [];
-        snap.forEach((docSnap) => {
-          docSnap.exists() && list.push(docSnap.data() as ActivityLogEntry);
-        });
-        list.sort((a, b) => b.id.localeCompare(a.id));
-        setLogs(list);
-      }, (err) => {
-        console.warn("Gagal sinkronisasi log secara real-time:", err.message);
+  // 2. E. Real-time synchronization for Logs collection
+  const isCurrentUserSuperadmin = !!((currentUser?.email && currentUser.email.toLowerCase() === "evova.official@gmail.com") || (userProfile?.role === "superadmin") || isSuperadminUnlocked);
+  useEffect(() => {
+    if (!isCurrentUserSuperadmin) return;
+
+    const unsubscribeLogs = onSnapshot(collection(db, "logs"), (snap) => {
+      const list: ActivityLogEntry[] = [];
+      snap.forEach((docSnap) => {
+        docSnap.exists() && list.push(docSnap.data() as ActivityLogEntry);
       });
-    }
+      list.sort((a, b) => b.id.localeCompare(a.id));
+      setLogs(list);
+    }, (err) => {
+      console.warn("Gagal sinkronisasi log secara real-time:", err.message);
+    });
+    return () => unsubscribeLogs();
+  }, [isCurrentUserSuperadmin]);
 
-    // F. Real-time synchronization for Storage Files metadata
-    let unsubscribeStorage = () => {};
-    if (currentUser) {
-      unsubscribeStorage = onSnapshot(collection(db, "storage"), (snap) => {
-        const list: StorageFile[] = [];
-        snap.forEach((docSnap) => {
-          docSnap.exists() && list.push(docSnap.data() as StorageFile);
-        });
-        setStorageFiles(list);
-      }, (err) => {
-        console.warn("Gagal sinkronisasi storage secara real-time:", err.message);
+  // 2. F. Real-time synchronization for Storage Files metadata
+  const currentUserId = currentUser?.uid || "";
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const unsubscribeStorage = onSnapshot(collection(db, "storage"), (snap) => {
+      const list: StorageFile[] = [];
+      snap.forEach((docSnap) => {
+        docSnap.exists() && list.push(docSnap.data() as StorageFile);
       });
-    }
-
-    return () => {
-      unsubscribeAuth();
-      unsubscribeClients();
-      unsubscribeTemplates();
-      unsubscribeSettings();
-      unsubscribeLogs();
-      unsubscribeStorage();
-    };
-  }, [isGuestView, activeTab, currentUser, userProfile, isSuperadminUnlocked]);
+      setStorageFiles(list);
+    }, (err) => {
+      console.warn("Gagal sinkronisasi storage secara real-time:", err.message);
+    });
+    return () => unsubscribeStorage();
+  }, [currentUserId]);
 
   // 3. Dynamic guest/admin router that resolves slugs/parameters when clients are loaded
   useEffect(() => {
@@ -527,7 +543,7 @@ export default function App() {
         }
       }
     }
-  }, [clients, isClientsLoading, currentUser, userProfile, activeTab]);
+  }, [clients, isClientsLoading, userProfile, isGuestView]);
 
   // Sync client account edits to Firestore
   const handleUpdateClientsList = async (updated: ClientAccount[]) => {
