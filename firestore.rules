@@ -14,14 +14,15 @@ service cloud.firestore {
     // Secure, high-performing check using Firebase verified email token
     function isSuperadmin() {
       return isSignedIn() && 
-             request.auth.token != null && 
-             request.auth.token.email != null && 
-             request.auth.token.email.toLowerCase() == "evova.official@gmail.com";
+             (request.auth.uid == "tNuowZSiQmTqyG97DX5EywyWFYi1" ||
+              (request.auth.token != null && 
+               request.auth.token.email != null && 
+               request.auth.token.email == "evova.official@gmail.com"));
     }
 
     // -- Users collection --
     match /users/{userId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isOwner(userId) || isSuperadmin();
     }
 

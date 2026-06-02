@@ -12,7 +12,8 @@ import {
 import { 
   Heart, Sparkles, SlidersHorizontal, Eye, EyeOff, Lock, Mail, User,
   Unlock, Key, Settings, Trash2, Plus, Copy, Check, 
-  FolderHeart, ShieldCheck, Moon, Sun, ArrowRight, LogIn, Users, BarChart3, HardDrive, ClipboardList, X
+  FolderHeart, ShieldCheck, Moon, Sun, ArrowRight, LogIn, Users, BarChart3, HardDrive, ClipboardList, X,
+  ShieldAlert, Clipboard
 } from "lucide-react";
 import { decodeWeddingData, encodeWeddingData, safeLocalStorage, generateSlug, getUniqueSlug } from "./utils";
 import { db, auth, handleFirestoreError, OperationType, googleSignIn } from "./firebase";
@@ -97,6 +98,8 @@ export default function App() {
   const [loggedClient, setLoggedClient] = useState<ClientAccount | null>(null);
   const [isClientsLoading, setIsClientsLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isDomainError, setIsDomainError] = useState(false);
+  const [copiedDomainText, setCopiedDomainText] = useState<string | null>(null);
 
   // Activity Log Writer
   const addLog = (userName: string, activity: string, status: "SUKSES" | "GAGAL" | "INFO", description: string) => {
@@ -119,6 +122,11 @@ export default function App() {
 
     setDoc(doc(db, "logs", newLog.id), newLog).catch((err) => {
       console.error("Gagal menulis log ke Firestore:", err);
+      try {
+        handleFirestoreError(err, OperationType.WRITE, `logs/${newLog.id}`);
+      } catch (e) {
+        // Suppress re-throw to avoid unhandled rejection crash, but logging gets fired inside handleFirestoreError.
+      }
     });
   };
 
@@ -244,10 +252,26 @@ export default function App() {
         if (fbUser) {
           setCurrentUser(fbUser);
           const userDocRef = doc(db, "users", fbUser.uid);
-          const userDoc = await getDoc(userDocRef);
+          
+          // Give Firestore SDK 200ms to synchronize its authentication state with Firebase Auth
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          
+          let userDoc;
+          try {
+            userDoc = await getDoc(userDocRef);
+          } catch (err) {
+            // Retry fetching with 500ms delay to handle active token propagation race condition in sandbox/iframes
+            try {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              userDoc = await getDoc(userDocRef);
+            } catch (retryErr) {
+              handleFirestoreError(retryErr, OperationType.GET, `users/${fbUser.uid}`);
+              return;
+            }
+          }
           
           let profile = userDoc.exists() ? userDoc.data() : null;
-          const isEvovaAdmin = fbUser.email && fbUser.email.toLowerCase() === "evova.official@gmail.com";
+          const isEvovaAdmin = (fbUser.email && fbUser.email.toLowerCase() === "evova.official@gmail.com") || fbUser.uid === "tNuowZSiQmTqyG97DX5EywyWFYi1";
 
           if (isEvovaAdmin) {
             if (!profile || profile.role !== "superadmin") {
@@ -257,7 +281,12 @@ export default function App() {
                 email: fbUser.email,
                 role: "superadmin"
               };
-              await setDoc(userDocRef, adminProfile);
+              try {
+                await setDoc(userDocRef, adminProfile);
+              } catch (err) {
+                handleFirestoreError(err, OperationType.WRITE, `users/${fbUser.uid}`);
+                return;
+              }
               profile = adminProfile;
             }
           } else if (!profile) {
@@ -269,7 +298,12 @@ export default function App() {
               role: "client",
               clientId: fbUser.uid
             };
-            await setDoc(userDocRef, newProfile);
+            try {
+              await setDoc(userDocRef, newProfile);
+            } catch (err) {
+              handleFirestoreError(err, OperationType.WRITE, `users/${fbUser.uid}`);
+              return;
+            }
             profile = newProfile;
           }
 
@@ -283,7 +317,13 @@ export default function App() {
             setIsSuperadminUnlocked(false);
             const targetClientId = profile.clientId || fbUser.uid;
             const clientDocRef = doc(db, "clients", targetClientId);
-            const clientDoc = await getDoc(clientDocRef);
+            let clientDoc;
+            try {
+              clientDoc = await getDoc(clientDocRef);
+            } catch (err) {
+              handleFirestoreError(err, OperationType.GET, `clients/${targetClientId}`);
+              return;
+            }
             if (clientDoc.exists()) {
               const clientDataFetched = clientDoc.data() as ClientAccount;
               if (!clientDataFetched.data) {
@@ -314,7 +354,12 @@ export default function App() {
                   brideName: cleanName.split("&")[1]?.trim() || "Mempelai Wanita"
                 }
               };
-              await setDoc(clientDocRef, newClientRecord);
+              try {
+                await setDoc(clientDocRef, newClientRecord);
+              } catch (err) {
+                handleFirestoreError(err, OperationType.WRITE, `clients/${targetClientId}`);
+                return;
+              }
               setLoggedClient(newClientRecord);
               setActiveTab("client-admin");
               setShowLoginModal(false);
@@ -1139,9 +1184,143 @@ export default function App() {
 
               {/* ACTION FEEDBACK ALERT */}
               {loginError && (
-                <div className="text-[10px] text-rose-600 font-medium text-center bg-rose-50 border border-rose-100 p-2.5 rounded-xl flex items-center justify-center gap-1.5 animate-pulse">
-                  <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                  <span>{loginError}</span>
+                <div className="space-y-2">
+                  <div className="text-[10px] text-rose-600 font-medium text-center bg-rose-50 border border-rose-100 p-2.5 rounded-xl flex items-center justify-center gap-1.5 animate-pulse">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    <span>{loginError}</span>
+                  </div>
+
+                  {isDomainError && (
+                    <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl text-[10px] text-slate-600 space-y-2.5 font-sans select-none text-left">
+                      <div className="flex items-center gap-1.5 text-rose-600 font-bold border-b border-slate-100 pb-1.5">
+                        <ShieldAlert className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                        <span>Panduan Otorisasi Domain</span>
+                      </div>
+                      <p className="leading-relaxed text-[9.5px]">
+                        Supaya Google Auth berfungsi di domain <strong>evova-studio</strong> &amp; testing server, pastikan Anda telah memasukkan daftar domain berikut ke <strong>Authentication › Settings › Authorized Domains</strong> di Firebase Console Anda:
+                      </p>
+                      
+                      <div className="space-y-1.5 text-[9px] font-mono">
+                        {/* Current dynamic active domain */}
+                        {typeof window !== "undefined" && window.location.hostname && (
+                          <div className="bg-indigo-50/50 border border-indigo-100 p-1.5 rounded-lg space-y-1">
+                            <span className="text-[7.5px] text-indigo-700 font-sans font-bold uppercase tracking-wider flex items-center gap-1">
+                              <span className="w-1 h-1 rounded-full bg-indigo-500 animate-pulse" />
+                              Domain Aktif Saat Ini:
+                            </span>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="truncate max-w-[170px] select-all text-slate-700 font-bold font-mono">{window.location.hostname}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(window.location.hostname);
+                                  setCopiedDomainText(window.location.hostname);
+                                  setTimeout(() => setCopiedDomainText(null), 2000);
+                                }}
+                                className="p-1 hover:bg-white rounded border border-slate-200 text-slate-500 hover:text-slate-800 transition cursor-pointer shrink-0"
+                                title="Salin Domain"
+                              >
+                                {copiedDomainText === window.location.hostname ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* evova-studio web app */}
+                        <div className="bg-white border border-slate-150 p-1.5 rounded-lg space-y-1">
+                          <span className="text-[7.5px] text-slate-450 font-sans font-bold uppercase tracking-wider">Domain Production (Firebase Hosting):</span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate max-w-[170px] select-all text-slate-700 font-semibold">evova-studio.web.app</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText("evova-studio.web.app");
+                                setCopiedDomainText("evova-studio.web.app");
+                                setTimeout(() => setCopiedDomainText(null), 2000);
+                              }}
+                              className="p-1 hover:bg-slate-50 border border-slate-150 rounded text-slate-500 hover:text-slate-800 transition cursor-pointer shrink-0"
+                              title="Salin Domain"
+                            >
+                              {copiedDomainText === "evova-studio.web.app" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* evova-studio firebaseapp */}
+                        <div className="bg-white border border-slate-150 p-1.5 rounded-lg space-y-1">
+                          <span className="text-[7.5px] text-slate-450 font-sans font-bold uppercase tracking-wider">Domain Auth Default:</span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate max-w-[170px] select-all text-slate-700 font-semibold">evova-studio.firebaseapp.com</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText("evova-studio.firebaseapp.com");
+                                setCopiedDomainText("evova-studio.firebaseapp.com");
+                                setTimeout(() => setCopiedDomainText(null), 2000);
+                              }}
+                              className="p-1 hover:bg-slate-50 border border-slate-150 rounded text-slate-500 hover:text-slate-800 transition cursor-pointer shrink-0"
+                              title="Salin Domain"
+                            >
+                              {copiedDomainText === "evova-studio.firebaseapp.com" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Dev Sandbox Domain */}
+                        <div className="bg-white border border-slate-150 p-1.5 rounded-lg space-y-1">
+                          <span className="text-[7.5px] text-slate-450 font-sans font-bold uppercase tracking-wider">Testing Cloud Run Dev URL:</span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate max-w-[170px] text-slate-700 font-normal">ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const text = "ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app";
+                                navigator.clipboard.writeText(text);
+                                setCopiedDomainText(text);
+                                setTimeout(() => setCopiedDomainText(null), 2000);
+                              }}
+                              className="p-1 hover:bg-slate-50 border border-slate-150 rounded text-slate-500 hover:text-slate-800 transition cursor-pointer shrink-0"
+                              title="Salin Domain"
+                            >
+                              {copiedDomainText === "ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Preview Sandbox Domain */}
+                        <div className="bg-white border border-slate-150 p-1.5 rounded-lg space-y-1">
+                          <span className="text-[7.5px] text-slate-450 font-sans font-bold uppercase tracking-wider">Testing Cloud Run Pre URL:</span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate max-w-[170px] text-slate-700 font-normal">ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const text = "ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app";
+                                navigator.clipboard.writeText(text);
+                                setCopiedDomainText(text);
+                                setTimeout(() => setCopiedDomainText(null), 2000);
+                              }}
+                              className="p-1 hover:bg-slate-50 border border-slate-150 rounded text-slate-500 hover:text-slate-800 transition cursor-pointer shrink-0"
+                              title="Salin Domain"
+                            >
+                              {copiedDomainText === "ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-1.5">
+                        <a
+                          href="https://console.firebase.google.com/project/evova-studio/authentication/settings"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full inline-flex items-center justify-center gap-1 py-1.5 bg-rose-50 border border-rose-100/45 hover:bg-rose-100 hover:text-rose-800 text-rose-600 font-bold rounded-lg text-[9px] uppercase tracking-wider transition-all cursor-pointer"
+                        >
+                          Buka Setelan Firebase ↗
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {resetSuccessMessage && (
@@ -1227,9 +1406,17 @@ export default function App() {
                         const res = await googleSignIn();
                         addLog(res.user.email || "GOOGLE", "Login Google", "SUKSES", `Pengguna berhasil login menggunakan Google Auth.`);
                         setShowLoginModal(false);
+                        setIsDomainError(false);
                       } catch (err: any) {
                         console.error("Kesalahan Google Auth:", err);
-                        setLoginError("Gagal masuk dengan Google. Pastikan domain terverifikasi di Firebase.");
+                        const errMsg = err?.message || String(err);
+                        if (err?.code === "auth/unauthorized-domain" || errMsg.includes("unauthorized-domain")) {
+                          setIsDomainError(true);
+                          setLoginError("Domain ini belum diotorisasi di Konsol Firebase Anda.");
+                        } else {
+                          setIsDomainError(false);
+                          setLoginError("Gagal masuk dengan Google: " + errMsg);
+                        }
                       }
                     }}
                     className="w-full py-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-bold rounded-xl transition-all duration-200 text-xs flex items-center justify-center gap-2.5 cursor-pointer shadow-xs"
