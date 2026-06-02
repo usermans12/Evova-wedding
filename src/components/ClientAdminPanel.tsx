@@ -448,6 +448,8 @@ export default function ClientAdminPanel({
             isClientOnly={true}
             activeTemplates={activeTemplates}
             onUploadFileToStorage={onUploadFileToStorage}
+            clientSlug={activeClient?.slug}
+            clientId={activeClient?.id}
           />
         </div>
 
@@ -574,7 +576,7 @@ export default function ClientAdminPanel({
                     {isDomainError && (
                       <div className="bg-white border border-rose-100 rounded-xl p-3 space-y-2.5 font-sans">
                         <p className="text-[10px] text-slate-600 leading-relaxed">
-                          Supaya fitur Google Auth &amp; Workspace berfungsi dengan lancar di domain <strong>evova-studio</strong> maupun di testing server, pastikan Anda telah memasukkan daftar domain berikut ke bagian <strong>Authorized Domains (Domain Resmi)</strong> di Firebase Console Anda:
+                          Supaya fitur Google Auth &amp; Workspace berfungsi dengan lancar di domain <strong>evova-wedding</strong> maupun di testing server, pastikan Anda telah memasukkan daftar domain berikut ke bagian <strong>Authorized Domains (Domain Resmi)</strong> di Firebase Console Anda:
                         </p>
                         
                         <div className="space-y-2 font-mono text-[9px]">
@@ -611,111 +613,111 @@ export default function ClientAdminPanel({
                           <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
                             <span className="text-[8px] text-slate-500 font-sans font-bold uppercase tracking-wider">Domain Production (Firebase Hosting):</span>
                             <div className="flex items-center justify-between gap-1">
-                              <span className="truncate text-slate-700 select-all font-semibold font-mono">evova-studio.web.app</span>
+                              <span className="truncate text-slate-700 select-all font-semibold font-mono">evova-wedding.web.app</span>
                               <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText("evova-studio.web.app");
-                                  setCopiedDomainText("evova-studio.web.app");
-                                  setTimeout(() => setCopiedDomainText(null), 2000);
-                                }}
-                                className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
-                                title="Salin Domain"
-                              >
-                                {copiedDomainText === "evova-studio.web.app" ? (
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                ) : (
-                                  <Clipboard className="w-3 h-3" />
-                                )}
-                              </button>
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText("evova-wedding.web.app");
+                                    setCopiedDomainText("evova-wedding.web.app");
+                                    setTimeout(() => setCopiedDomainText(null), 2000);
+                                  }}
+                                  className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
+                                  title="Salin Domain"
+                                >
+                                  {copiedDomainText === "evova-wedding.web.app" ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Clipboard className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Evova Studio Firebaseapp Auth Domain */}
+                            <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
+                              <span className="text-[8px] text-slate-500 font-sans font-bold uppercase tracking-wider">Domain Auth Default:</span>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="truncate text-slate-700 select-all font-semibold font-mono">evova-wedding.firebaseapp.com</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText("evova-wedding.firebaseapp.com");
+                                    setCopiedDomainText("evova-wedding.firebaseapp.com");
+                                    setTimeout(() => setCopiedDomainText(null), 2000);
+                                  }}
+                                  className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
+                                  title="Salin Domain"
+                                >
+                                  {copiedDomainText === "evova-wedding.firebaseapp.com" ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Clipboard className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Development Sandboxes / Container URLs (fallback fallback) */}
+                            <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
+                              <span className="text-[8px] text-slate-500 font-sans font-bold uppercase tracking-wider font-sans">Testing Cloud Run Dev URL:</span>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="truncate text-slate-700 font-mono">ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const text = "ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app";
+                                    navigator.clipboard.writeText(text);
+                                    setCopiedDomainText(text);
+                                    setTimeout(() => setCopiedDomainText(null), 2000);
+                                  }}
+                                  className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
+                                  title="Salin Domain"
+                                >
+                                  {copiedDomainText === "ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app" ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Clipboard className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
+                              <span className="text-[8px] text-slate-500 font-sans font-bold uppercase tracking-wider font-sans">Testing Cloud Run Pre URL:</span>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="truncate text-slate-700 font-mono">ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const text = "ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app";
+                                    navigator.clipboard.writeText(text);
+                                    setCopiedDomainText(text);
+                                    setTimeout(() => setCopiedDomainText(null), 2000);
+                                  }}
+                                  className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
+                                  title="Salin Domain"
+                                >
+                                  {copiedDomainText === "ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app" ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Clipboard className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           </div>
 
-                          {/* Evova Studio Firebaseapp Auth Domain */}
-                          <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
-                            <span className="text-[8px] text-slate-500 font-sans font-bold uppercase tracking-wider">Domain Auth Default:</span>
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="truncate text-slate-700 select-all font-semibold font-mono">evova-studio.firebaseapp.com</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText("evova-studio.firebaseapp.com");
-                                  setCopiedDomainText("evova-studio.firebaseapp.com");
-                                  setTimeout(() => setCopiedDomainText(null), 2000);
-                                }}
-                                className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
-                                title="Salin Domain"
-                              >
-                                {copiedDomainText === "evova-studio.firebaseapp.com" ? (
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                ) : (
-                                  <Clipboard className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Development Sandboxes / Container URLs (fallback fallback) */}
-                          <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
-                            <span className="text-[8px] text-slate-500 font-sans font-bold uppercase tracking-wider font-sans">Testing Cloud Run Dev URL:</span>
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="truncate text-slate-700 font-mono">ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const text = "ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app";
-                                  navigator.clipboard.writeText(text);
-                                  setCopiedDomainText(text);
-                                  setTimeout(() => setCopiedDomainText(null), 2000);
-                                }}
-                                className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
-                                title="Salin Domain"
-                              >
-                                {copiedDomainText === "ais-dev-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app" ? (
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                ) : (
-                                  <Clipboard className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg space-y-1">
-                            <span className="text-[8px] text-slate-500 font-sans font-bold uppercase tracking-wider font-sans">Testing Cloud Run Pre URL:</span>
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="truncate text-slate-700 font-mono">ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const text = "ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app";
-                                  navigator.clipboard.writeText(text);
-                                  setCopiedDomainText(text);
-                                  setTimeout(() => setCopiedDomainText(null), 2000);
-                                }}
-                                className="shrink-0 p-1 bg-white hover:bg-slate-100 text-slate-600 rounded border border-slate-200 transition cursor-pointer"
-                                title="Salin Domain"
-                              >
-                                {copiedDomainText === "ais-pre-qdjcuoqbw2fiwn7lv7jnmh-585558544711.asia-southeast1.run.app" ? (
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                ) : (
-                                  <Clipboard className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
+                          <div className="pt-1">
+                            <a
+                              href="https://console.firebase.google.com/project/evova-wedding/authentication/settings"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full inline-flex items-center justify-center gap-1 py-1.5 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100/60 text-indigo-700 font-bold rounded-lg text-[9px] uppercase tracking-wider transition-all"
+                            >
+                              Buka Firebase Console ↗
+                            </a>
                           </div>
                         </div>
-
-                        <div className="pt-1">
-                          <a
-                            href="https://console.firebase.google.com/project/evova-studio/authentication/settings"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="w-full inline-flex items-center justify-center gap-1 py-1.5 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100/60 text-indigo-700 font-bold rounded-lg text-[9px] uppercase tracking-wider transition-all"
-                          >
-                            Buka Firebase Console ↗
-                          </a>
-                        </div>
-                      </div>
                     )}
                   </div>
                 )}

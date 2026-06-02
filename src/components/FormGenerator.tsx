@@ -30,6 +30,8 @@ interface FormGeneratorProps {
   isClientOnly?: boolean;
   activeTemplates?: TemplatePreset[];
   onUploadFileToStorage?: (fileName: string, fileSize: string, fileType: "photo" | "music" | "qris" | "thumbnail", url: string) => void;
+  clientSlug?: string;
+  clientId?: string;
 }
 
 const TEMPLATE_PRESETS = [
@@ -239,7 +241,9 @@ export default function FormGenerator({
   onUpdatePasscode,
   isClientOnly = false,
   activeTemplates = [],
-  onUploadFileToStorage
+  onUploadFileToStorage,
+  clientSlug = "",
+  clientId = ""
 }: FormGeneratorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const qrisInputRef = useRef<HTMLInputElement>(null);
@@ -276,6 +280,39 @@ export default function FormGenerator({
   const [guestLinkType, setGuestLinkType] = useState<"short" | "full">("short");
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+
+  // Helper to generate correct guest link based on slug or client id
+  const generateGuestLink = () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://undangan-pernikahan.com";
+    const suffix = shareGuestName.trim() ? (shareGuestSalutation ? `${shareGuestSalutation} ${shareGuestName}` : shareGuestName) : "";
+    const payloadStr = encodeWeddingData(data);
+    
+    // Build actual base URL permanently pointing to the wedding route
+    let base = origin;
+    if (clientSlug) {
+      base = `${origin}/wedding/${clientSlug}`;
+    } else if (clientId) {
+      base = `${origin}/?client=${clientId}`;
+    } else if (currentClientId) {
+      base = `${origin}/?client=${currentClientId}`;
+    }
+    
+    if (guestLinkType === "short") {
+      if (suffix) {
+        const sep = base.includes("?") ? "&" : "?";
+        return `${base}${sep}to=${encodeURIComponent(suffix)}`;
+      }
+      return base;
+    } else {
+      // Full portable offline-friendly link with direct payload parameter (p)
+      const sep = base.includes("?") ? "&" : "?";
+      const pStr = `p=${payloadStr}`;
+      if (suffix) {
+        return `${base}${sep}${pStr}&to=${encodeURIComponent(suffix)}`;
+      }
+      return `${base}${sep}${pStr}`;
+    }
+  };
 
   // Auto-save wedding data to memory
   const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string>("");
@@ -648,8 +685,8 @@ export default function FormGenerator({
         if (e.target) e.target.value = "";
         return;
       }
-      if (file.size > 3.5 * 1024 * 1025) {
-        setAudioError("Ukuran file musik terlalu besar (maksimal 3.5 MB). Silakan pilih file musik MP3 yang lebih kecil agar muat di penyimpanan lokal!");
+      if (file.size > 15 * 1024 * 1024) {
+        setAudioError("Ukuran file musik terlalu besar (maksimal 15 MB). Silakan pilih file musik MP3 yang berukuran lebih kecil!");
         return;
       }
       const reader = new FileReader();
@@ -2135,13 +2172,7 @@ export default function FormGenerator({
                   <button
                     type="button"
                     onClick={() => {
-                      const url = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "https://undangan-pernikahan.com";
-                      const suffix = shareGuestName.trim() ? (shareGuestSalutation ? `${shareGuestSalutation} ${shareGuestName}` : shareGuestName) : "";
-                      const payloadStr = encodeWeddingData(data);
-                      const baseParams = `p=${payloadStr}`;
-                      const fullUrl = guestLinkType === "short"
-                        ? (suffix ? `${url}?to=${encodeURIComponent(suffix)}` : url)
-                        : (suffix ? `${url}?${baseParams}&to=${encodeURIComponent(suffix)}` : `${url}?${baseParams}`);
+                      const fullUrl = generateGuestLink();
                       navigator.clipboard.writeText(fullUrl);
                       setCopiedLink(true);
                       setTimeout(() => setCopiedLink(false), 2000);
@@ -2162,15 +2193,7 @@ export default function FormGenerator({
                   </button>
                 </div>
                 <div className="p-2 border border-emerald-500/10 rounded-lg bg-slate-950 text-[10px] break-all text-emerald-300 font-mono">
-                  {(() => {
-                    const url = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "https://undangan-pernikahan.com";
-                    const suffix = shareGuestName.trim() ? (shareGuestSalutation ? `${shareGuestSalutation} ${shareGuestName}` : shareGuestName) : "";
-                    const payloadStr = encodeWeddingData(data);
-                    const baseParams = `p=${payloadStr}`;
-                    return guestLinkType === "short"
-                      ? (suffix ? `${url}?to=${encodeURIComponent(suffix)}` : url)
-                      : (suffix ? `${url}?${baseParams}&to=${encodeURIComponent(suffix)}` : `${url}?${baseParams}`);
-                  })()}
+                  {generateGuestLink()}
                 </div>
               </div>
 
@@ -2180,13 +2203,8 @@ export default function FormGenerator({
                 <div className="relative">
                   <textarea
                     value={(() => {
-                      const url = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "https://undangan-pernikahan.com";
+                      const fullUrl = generateGuestLink();
                       const suffix = shareGuestName.trim() ? (shareGuestSalutation ? `${shareGuestSalutation} ${shareGuestName}` : shareGuestName) : "";
-                      const payloadStr = encodeWeddingData(data);
-                      const baseParams = `p=${payloadStr}`;
-                      const fullUrl = guestLinkType === "short"
-                        ? (suffix ? `${url}?to=${encodeURIComponent(suffix)}` : url)
-                        : (suffix ? `${url}?${baseParams}&to=${encodeURIComponent(suffix)}` : `${url}?${baseParams}`);
                       const nameStr = suffix || "Bapak/Ibu/Saudara/i";
                       const groomNick = data.groomNick || data.groomName.split(" ")[0];
                       const brideNick = data.brideNick || data.brideName.split(" ")[0];
@@ -2221,13 +2239,8 @@ Salam hangat,
                     <button
                       type="button"
                       onClick={() => {
-                        const url = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "https://undangan-pernikahan.com";
+                        const fullUrl = generateGuestLink();
                         const suffix = shareGuestName.trim() ? (shareGuestSalutation ? `${shareGuestSalutation} ${shareGuestName}` : shareGuestName) : "";
-                        const payloadStr = encodeWeddingData(data);
-                        const baseParams = `p=${payloadStr}`;
-                        const fullUrl = guestLinkType === "short"
-                          ? (suffix ? `${url}?to=${encodeURIComponent(suffix)}` : url)
-                          : (suffix ? `${url}?${baseParams}&to=${encodeURIComponent(suffix)}` : `${url}?${baseParams}`);
                         const nameStr = suffix || "Bapak/Ibu/Saudara/i";
                         const groomNick = data.groomNick || data.groomName.split(" ")[0];
                         const brideNick = data.brideNick || data.brideName.split(" ")[0];
@@ -2275,13 +2288,8 @@ Salam hangat,
 
                     <a
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent((() => {
-                        const url = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "https://undangan-pernikahan.com";
+                        const fullUrl = generateGuestLink();
                         const suffix = shareGuestName.trim() ? (shareGuestSalutation ? `${shareGuestSalutation} ${shareGuestName}` : shareGuestName) : "";
-                        const payloadStr = encodeWeddingData(data);
-                        const baseParams = `p=${payloadStr}`;
-                        const fullUrl = guestLinkType === "short"
-                          ? (suffix ? `${url}?to=${encodeURIComponent(suffix)}` : url)
-                          : (suffix ? `${url}?${baseParams}&to=${encodeURIComponent(suffix)}` : `${url}?${baseParams}`);
                         const nameStr = suffix || "Bapak/Ibu/Saudara/i";
                         const groomNick = data.groomNick || data.groomName.split(" ")[0];
                         const brideNick = data.brideNick || data.brideName.split(" ")[0];

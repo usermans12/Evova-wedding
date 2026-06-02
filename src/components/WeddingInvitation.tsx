@@ -475,25 +475,47 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
 
   // Load Wishes and sync from Firestore in real-time if available
   useEffect(() => {
-    if (!clientId) {
-      setWishes([]);
-      return;
-    }
+    let activeClientId = clientId;
+    let unsubscribeWishes: (() => void) | null = null;
 
-    const wishesRef = collection(db, "clients", clientId, "wishes");
-    const q = query(wishesRef, orderBy("createdAt", "desc"));
-    
-    const unsubscribeWishes = onSnapshot(q, (snapshot) => {
-      const cloudWishes: GuestWish[] = [];
-      snapshot.forEach((snap) => {
-        cloudWishes.push(snap.data() as GuestWish);
+    const setupWishesListener = async () => {
+      if (!activeClientId) {
+        try {
+          const clientsSnap = await getDocs(collection(db, "clients"));
+          if (!clientsSnap.empty) {
+            activeClientId = clientsSnap.docs[0].id;
+          }
+        } catch (err) {
+          console.warn("Gagal mengambil fallback client ID untuk wishes:", err);
+        }
+      }
+
+      if (!activeClientId) {
+        setWishes([]);
+        return;
+      }
+
+      const wishesRef = collection(db, "clients", activeClientId, "wishes");
+      const q = query(wishesRef, orderBy("createdAt", "desc"));
+      
+      unsubscribeWishes = onSnapshot(q, (snapshot) => {
+        const cloudWishes: GuestWish[] = [];
+        snapshot.forEach((snap) => {
+          cloudWishes.push(snap.data() as GuestWish);
+        });
+        setWishes(cloudWishes);
+      }, (err) => {
+        console.error("Gagal mengunduh review tamu live secara real-time dari Firestore:", err);
       });
-      setWishes(cloudWishes);
-    }, (err) => {
-      console.error("Gagal mengunduh review tamu live secara real-time dari Firestore:", err);
-    });
+    };
 
-    return () => unsubscribeWishes();
+    setupWishesListener();
+
+    return () => {
+      if (unsubscribeWishes) {
+        unsubscribeWishes();
+      }
+    };
   }, [clientId]);
 
   // Initialize petals background particles
@@ -563,6 +585,23 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
     } else {
       audioRef.current.pause();
     }
+  }, [isOpen, isPlaying]);
+
+  // Robust interaction fallback to query and force play background music if user interacts anyway
+  useEffect(() => {
+    const resumeAudioOnGesture = () => {
+      if (isOpen && isPlaying && audioRef.current && audioRef.current.paused) {
+        audioRef.current.play().catch(() => {});
+      }
+    };
+    window.addEventListener("click", resumeAudioOnGesture, { passive: true });
+    window.addEventListener("touchstart", resumeAudioOnGesture, { passive: true });
+    window.addEventListener("scroll", resumeAudioOnGesture, { passive: true });
+    return () => {
+      window.removeEventListener("click", resumeAudioOnGesture);
+      window.removeEventListener("touchstart", resumeAudioOnGesture);
+      window.removeEventListener("scroll", resumeAudioOnGesture);
+    };
   }, [isOpen, isPlaying]);
 
   const handleOpenInvitation = () => {
@@ -644,9 +683,14 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
   };
 
   const copyAccountNumber = () => {
-    navigator.clipboard.writeText(data.bankAccount);
-    setCopiedAccount(true);
-    setTimeout(() => setCopiedAccount(false), 2500);
+    if (!data.bankAccount) return;
+    try {
+      navigator.clipboard.writeText(data.bankAccount);
+      setCopiedAccount(true);
+      setTimeout(() => setCopiedAccount(false), 2500);
+    } catch (err) {
+      console.warn("Gagal menyalin nomor rekening:", err);
+    }
   };
 
   const handleWishSubmit = async (e: React.FormEvent) => {
@@ -666,10 +710,22 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
     const updatedWishes = [newWish, ...wishes];
     setWishes(updatedWishes);
 
-    // Upload to Firestore if clientId is present
-    if (clientId) {
+    // Upload to Firestore: fallback gracefully to first client if clientId is missing (empty/landing link or guest view fallback)
+    let targetClientId = clientId;
+    if (!targetClientId) {
       try {
-        const wishDocRef = doc(db, "clients", clientId, "wishes", newWish.id);
+        const clientsSnap = await getDocs(collection(db, "clients"));
+        if (!clientsSnap.empty) {
+          targetClientId = clientsSnap.docs[0].id;
+        }
+      } catch (err) {
+        console.warn("Gagal mengambil fallback client ID untuk guest rsvp:", err);
+      }
+    }
+
+    if (targetClientId) {
+      try {
+        const wishDocRef = doc(db, "clients", targetClientId, "wishes", newWish.id);
         await setDoc(wishDocRef, newWish);
       } catch (err) {
         console.error("Gagal mengirim doa restu ke Cloud Firestore:", err);
@@ -1838,17 +1894,18 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
                   
                   <div className="flex items-center justify-between">
                     <span className="text-[8px] font-mono tracking-[0.2em] text-white/70">PREMIUM WEDDING APPRECIATION</span>
-                    <span className="text-[11px] font-bold tracking-wider text-white font-mono">{data.bankName}</span>
+                    <span className="text-[11px] font-bold tracking-wider text-white font-mono">{data.bankName || "BANK TRANSFER / E-WALLET"}</span>
                   </div>
 
                   <div className="py-1">
                     <div className="text-[9px] text-white/75 font-mono">NOMOR REKENING:</div>
                     <div className="text-lg md:text-xl font-mono tracking-wider font-bold text-white flex items-center gap-2 mt-1 select-all">
-                      {data.bankAccount}
+                      {data.bankAccount || "(Belum diatur Rekening)"}
                       
                       <button
                         onClick={copyAccountNumber}
-                        className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all cursor-pointer border border-white/10"
+                        disabled={!data.bankAccount}
+                        className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-all cursor-pointer border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Salin No Rekening"
                       >
                         {copiedAccount ? <Check className="w-3.5 h-3.5 text-[#10b981] animate-pulse" /> : <Copy className="w-3.5 h-3.5" />}
@@ -1859,7 +1916,7 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
                   <div className="flex items-end justify-between pt-1">
                     <div>
                       <div className="text-[9px] text-white/75 font-mono">PENERIMA (A/N):</div>
-                      <div className="text-xs font-semibold uppercase text-white tracking-wide mt-0.5 font-sans">{data.bankUser}</div>
+                      <div className="text-xs font-semibold uppercase text-white tracking-wide mt-0.5 font-sans">{data.bankUser || "(Nama Belum diatur)"}</div>
                     </div>
                     {copiedAccount && (
                       <span className="text-[8px] font-semibold text-[#10b981] bg-white rounded px-2.5 py-1 animate-pulse">

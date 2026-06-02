@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import FormGenerator from "./components/FormGenerator";
 import WeddingInvitation from "./components/WeddingInvitation";
 import SuperadminPanel from "./components/SuperadminPanel";
@@ -13,7 +14,7 @@ import {
   Heart, Sparkles, SlidersHorizontal, Eye, EyeOff, Lock, Mail, User,
   Unlock, Key, Settings, Trash2, Plus, Copy, Check, 
   FolderHeart, ShieldCheck, Moon, Sun, ArrowRight, LogIn, Users, BarChart3, HardDrive, ClipboardList, X,
-  ShieldAlert, Clipboard
+  ShieldAlert, Clipboard, CheckCircle, XCircle, Info
 } from "lucide-react";
 import { decodeWeddingData, encodeWeddingData, safeLocalStorage, generateSlug, getUniqueSlug } from "./utils";
 import { db, auth, handleFirestoreError, OperationType, googleSignIn } from "./firebase";
@@ -38,7 +39,22 @@ import {
 
 export default function App() {
   // Current active viewport tab
-  const [activeTab, setActiveTab] = useState<"landing" | "superadmin" | "client-admin" | "wedding-preview">("landing");
+  const [activeTab, setActiveTab] = useState<"landing" | "superadmin" | "client-admin" | "wedding-preview">(() => {
+    try {
+      const cached = safeLocalStorage.getItem("marriage_active_tab");
+      if (cached === "client-admin" || cached === "superadmin" || cached === "wedding-preview" || cached === "landing") {
+        return cached as any;
+      }
+    } catch {}
+    return "landing";
+  });
+
+  useEffect(() => {
+    try {
+      safeLocalStorage.setItem("marriage_active_tab", activeTab);
+    } catch {}
+  }, [activeTab]);
+
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginRole, setLoginRole] = useState<"client" | "superadmin">("client");
   const [loginUsername, setLoginUsername] = useState("");
@@ -50,8 +66,22 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Firebase Auth states & sign up flow fields
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const cached = safeLocalStorage.getItem("marriage_current_user");
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [userProfile, setUserProfile] = useState<any>(() => {
+    try {
+      const cached = safeLocalStorage.getItem("marriage_user_profile");
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [registerName, setRegisterName] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
@@ -85,7 +115,13 @@ export default function App() {
   const [directGuestData, setDirectGuestData] = useState<WeddingData | null>(null);
   
   // Security locks states
-  const [isSuperadminUnlocked, setIsSuperadminUnlocked] = useState(false);
+  const [isSuperadminUnlocked, setIsSuperadminUnlocked] = useState(() => {
+    try {
+      return safeLocalStorage.getItem("marriage_is_superadmin_unlocked") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [saUsernameInput, setSaUsernameInput] = useState("");
   const [saPasswordInput, setSaPasswordInput] = useState("");
   const [saLoginError, setSaLoginError] = useState("");
@@ -95,11 +131,57 @@ export default function App() {
   const [previewDataOverride, setPreviewDataOverride] = useState<WeddingData | null>(null);
 
   // Active Client Login State
-  const [loggedClient, setLoggedClient] = useState<ClientAccount | null>(null);
+  const [loggedClient, setLoggedClient] = useState<ClientAccount | null>(() => {
+    try {
+      const cached = safeLocalStorage.getItem("marriage_logged_client");
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isClientsLoading, setIsClientsLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
   const [isDomainError, setIsDomainError] = useState(false);
   const [copiedDomainText, setCopiedDomainText] = useState<string | null>(null);
+
+  // Dynamic system toast notifications
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "error" | "info" }[]>([]);
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    const id = "toast-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4500);
+  };
+
+  const translateAuthError = (code: string, defaultMsg: string): string => {
+    const cleanCode = code?.replace("auth/", "") || "";
+    switch (cleanCode) {
+      case "invalid-email":
+        return "Format email tidak valid. Pastikan penulisan email sudah benar (contoh: nama@email.com).";
+      case "user-not-found":
+        return "Akun email ini tidak ditemukan. Silakan periksa kembali atau daftarkan akun baru.";
+      case "wrong-password":
+        return "Kata sandi yang Anda masukkan salah. Silakan coba kembali.";
+      case "email-already-in-use":
+        return "Alamat email ini sudah terdaftar. Silakan gunakan email lain atau langsung hubungi admin.";
+      case "weak-password":
+        return "Kata sandi terlalu pendek/lemah. Sandi harus minimal memiliki panjang 6 karakter.";
+      case "popup-closed-by-user":
+        return "Otentikasi dibatalkan karena jendela login Google ditutup.";
+      case "cancelled-popup-request":
+        return "Verifikasi Google dibatalkan karena ada popup masuk baru yang dibuka.";
+      case "unauthorized-domain":
+        return "Domain situs ini belum diizinkan di Google/Firebase Console Authorized Domains.";
+      case "too-many-requests":
+        return "Terlalu banyak percobaan masuk yang salah. Akun diblokir sementara demi keamanan. Silakan coba sesaat lagi.";
+      case "network-request-failed":
+        return "Koneksi jaringan terganggu. Silakan periksa jaringan internet Anda dan coba lagi.";
+      default:
+        return defaultMsg || "Sistem mengalami kegagalan proses otentikasi.";
+    }
+  };
 
   // Activity Log Writer
   const addLog = (userName: string, activity: string, status: "SUKSES" | "GAGAL" | "INFO", description: string) => {
@@ -250,6 +332,13 @@ export default function App() {
       try {
         if (fbUser) {
           setCurrentUser(fbUser);
+          safeLocalStorage.setItem("marriage_current_user", JSON.stringify({
+            uid: fbUser.uid,
+            email: fbUser.email,
+            displayName: fbUser.displayName,
+            photoURL: fbUser.photoURL
+          }));
+
           const userDocRef = doc(db, "users", fbUser.uid);
           
           await new Promise((resolve) => setTimeout(resolve, 200));
@@ -305,13 +394,17 @@ export default function App() {
           }
 
           setUserProfile(profile);
+          safeLocalStorage.setItem("marriage_user_profile", JSON.stringify(profile));
           
           if (profile && profile.role === "superadmin") {
             setIsSuperadminUnlocked(true);
+            safeLocalStorage.setItem("marriage_is_superadmin_unlocked", "true");
             setActiveTab("superadmin");
+            safeLocalStorage.setItem("marriage_active_tab", "superadmin");
             setShowLoginModal(false);
           } else if (profile && profile.role === "client") {
             setIsSuperadminUnlocked(false);
+            safeLocalStorage.setItem("marriage_is_superadmin_unlocked", "false");
             const targetClientId = profile.clientId || fbUser.uid;
             const clientDocRef = doc(db, "clients", targetClientId);
             let clientDoc;
@@ -327,7 +420,9 @@ export default function App() {
                 clientDataFetched.data = { ...defaultWeddingData };
               }
               setLoggedClient(clientDataFetched);
+              safeLocalStorage.setItem("marriage_logged_client", JSON.stringify(clientDataFetched));
               setActiveTab("client-admin");
+              safeLocalStorage.setItem("marriage_active_tab", "client-admin");
               setShowLoginModal(false);
             } else {
               const cleanName = profile.name || "Klien Pernikahan";
@@ -358,7 +453,9 @@ export default function App() {
                 return;
               }
               setLoggedClient(newClientRecord);
+              safeLocalStorage.setItem("marriage_logged_client", JSON.stringify(newClientRecord));
               setActiveTab("client-admin");
+              safeLocalStorage.setItem("marriage_active_tab", "client-admin");
               setShowLoginModal(false);
             }
           }
@@ -367,6 +464,11 @@ export default function App() {
           setUserProfile(null);
           setIsSuperadminUnlocked(false);
           setLoggedClient(null);
+          safeLocalStorage.removeItem("marriage_current_user");
+          safeLocalStorage.removeItem("marriage_user_profile");
+          safeLocalStorage.removeItem("marriage_is_superadmin_unlocked");
+          safeLocalStorage.removeItem("marriage_logged_client");
+          safeLocalStorage.removeItem("marriage_active_tab");
         }
       } catch (err) {
         console.error("Gagal memuat profil auth:", err);
@@ -379,6 +481,8 @@ export default function App() {
   }, []);
 
   // 2. B. Real-time synchronization for Clients list
+  const isCurrentUserSuperadmin = !!((currentUser?.email && currentUser.email.toLowerCase() === "evova.official@gmail.com") || (userProfile?.role === "superadmin") || isSuperadminUnlocked);
+
   useEffect(() => {
     const unsubscribeClients = onSnapshot(collection(db, "clients"), (snap) => {
       const list: ClientAccount[] = [];
@@ -408,15 +512,17 @@ export default function App() {
         setTemplates(list);
       } else {
         setTemplates(defaultTemplatesList);
-        defaultTemplatesList.forEach(tpl => {
-          setDoc(doc(db, "templates", tpl.id), tpl).catch(console.error);
-        });
+        if (isCurrentUserSuperadmin) {
+          defaultTemplatesList.forEach(tpl => {
+            setDoc(doc(db, "templates", tpl.id), tpl).catch(console.error);
+          });
+        }
       }
     }, (err) => {
       console.warn("Sinkroniasi template ditangguhkan:", err.message);
     });
     return () => unsubscribeTemplates();
-  }, []);
+  }, [isCurrentUserSuperadmin]);
 
   // 2. D. Real-time synchronization for Global settings / toggles
   useEffect(() => {
@@ -424,31 +530,33 @@ export default function App() {
       if (snap.exists()) {
         setFeatureToggles(snap.data() as GlobalFeatureToggles);
       } else {
-        setDoc(doc(db, "settings", "global"), {
-          rsvp: true,
-          guestbook: true,
-          gallery: true,
-          music: true,
-          countdown: true,
-          loveStory: true,
-          giftDigital: true,
-          googleMaps: true,
-          animationPremium: true,
-          exportJson: true,
-          uploadVideo: true,
-          floatingMusic: true,
-          watermark: false,
-          analytics: true
-        }).catch(console.error);
+        setTemplates(defaultTemplatesList); // Fallback locally
+        if (isCurrentUserSuperadmin) {
+          setDoc(doc(db, "settings", "global"), {
+            rsvp: true,
+            guestbook: true,
+            gallery: true,
+            music: true,
+            countdown: true,
+            loveStory: true,
+            giftDigital: true,
+            googleMaps: true,
+            animationPremium: true,
+            exportJson: true,
+            uploadVideo: true,
+            floatingMusic: true,
+            watermark: false,
+            analytics: true
+          }).catch(console.error);
+        }
       }
     }, (err) => {
       console.warn("Sinkroniasi settings ditangguhkan:", err.message);
     });
     return () => unsubscribeSettings();
-  }, []);
+  }, [isCurrentUserSuperadmin]);
 
   // 2. E. Real-time synchronization for Logs collection
-  const isCurrentUserSuperadmin = !!((currentUser?.email && currentUser.email.toLowerCase() === "evova.official@gmail.com") || (userProfile?.role === "superadmin") || isSuperadminUnlocked);
   useEffect(() => {
     if (!isCurrentUserSuperadmin) return;
 
@@ -508,8 +616,11 @@ export default function App() {
       if (foundClient) {
         setDirectGuestData(foundClient.data);
       } else if (!isClientsLoading && clients.length > 0) {
+        // Safe redirection to avoid infinite rendering loop if slug is not found
+        setDirectGuestData(null);
         setIsGuestView(false);
         setActiveTab("landing");
+        window.history.pushState({}, "", "/");
       }
     } else if (idParam) {
       setIsGuestView(true);
@@ -517,20 +628,35 @@ export default function App() {
       if (foundClient) {
         setDirectGuestData(foundClient.data);
       } else if (!isClientsLoading && clients.length > 0) {
+        // Safe redirection to avoid rendering loop with wrong client ID params
+        setDirectGuestData(null);
+        setIsGuestView(false);
+        setActiveTab("landing");
+        window.history.pushState({}, "", "/");
+      }
+    } else if (params.get("to")) {
+      // Automatic fallback for legacy guest links that don't have client/slug parameters specified (e.g. copied old root link)
+      setIsGuestView(true);
+      if (!isClientsLoading && clients.length > 0) {
+        // Fallback to presenting the first active wedding client's details
         setDirectGuestData(clients[0].data);
       }
     } else {
       if (path === "/superadmin") {
-        if (userProfile?.role === "superadmin") {
-          setActiveTab("superadmin");
+        if (userProfile?.role === "superadmin" || isSuperadminUnlocked) {
+          if (activeTab !== "client-admin" && activeTab !== "wedding-preview") {
+            setActiveTab("superadmin");
+          }
         } else {
           setActiveTab("landing");
           setLoginRole("superadmin");
           setShowLoginModal(true);
         }
       } else if (path === "/client-admin") {
-        if (userProfile?.role === "client") {
-          setActiveTab("client-admin");
+        if (userProfile?.role === "client" || loggedClient) {
+          if (activeTab !== "client-admin" && activeTab !== "wedding-preview") {
+            setActiveTab("client-admin");
+          }
         } else {
           setActiveTab("landing");
           setLoginRole("client");
@@ -538,12 +664,22 @@ export default function App() {
         }
       } else {
         if (activeTab === "wedding-preview") return; // Keep active preview
-        if (!isGuestView) {
-          setActiveTab("landing");
+        
+        // Prevent logged-in users from being kicked back to landing due to empty/root browser path
+        if (userProfile?.role === "superadmin" || isSuperadminUnlocked) {
+          if (activeTab !== "superadmin" && activeTab !== "client-admin" && activeTab !== "wedding-preview") {
+            setActiveTab("superadmin");
+          }
+        } else if (userProfile?.role === "client" || loggedClient) {
+          if (activeTab !== "client-admin" && activeTab !== "wedding-preview") {
+            setActiveTab("client-admin");
+          }
+        } else {
+          if (activeTab !== "landing") setActiveTab("landing");
         }
       }
     }
-  }, [clients, isClientsLoading, userProfile, isGuestView]);
+  }, [clients, isClientsLoading, userProfile, isGuestView, isSuperadminUnlocked, loggedClient, activeTab]);
 
   // Sync client account edits to Firestore
   const handleUpdateClientsList = async (updated: ClientAccount[]) => {
@@ -741,10 +877,16 @@ export default function App() {
       setLoggedClient(null);
       sessionStorage.removeItem("wedding_client_session_id");
       localStorage.removeItem("wedding_client_session_id");
-      setActiveTab("landing");
-      signOut(auth).catch(console.error);
-      if (typeof window !== "undefined") {
-        window.history.pushState({}, "", "/");
+      
+      const isSuper = (userProfile?.role === "superadmin" || isSuperadminUnlocked);
+      if (isSuper) {
+        setActiveTab("superadmin");
+      } else {
+        setActiveTab("landing");
+        signOut(auth).catch(console.error);
+        if (typeof window !== "undefined") {
+          window.history.pushState({}, "", "/");
+        }
       }
     }
   };
@@ -1028,8 +1170,14 @@ export default function App() {
             onDeleteStorageFile={handleDeleteStorageFileId}
             onSelectClientForEdit={(clientId) => {
               const c = clients.find(cl => cl.id === clientId);
-              if (c) handlePreviewDirectClick(c.data);
+              if (c) {
+                setLoggedClient(c);
+                setActiveTab("client-admin");
+                addLog("ADMIN-SUPER", "Impersonasi Klien", "SUKSES", `Superadmin masuk ke panel editing draf klien ${c.name}.`);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
             }}
+            onPreviewClient={handlePreviewDirectClick}
             currentUser="ADMIN-SUPER"
             addLog={addLog}
           />
@@ -1113,7 +1261,7 @@ export default function App() {
       {/* UNIFIED LOGIN MODAL - COMPLETELY OVERHAULED */}
       {/* ==================================================== */}
       {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm font-sans transition-all duration-300">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm font-sans transition-all duration-300">
           <div className="w-full max-w-md bg-white/95 backdrop-blur-md rounded-[2rem] border border-slate-100 shadow-[0_25px_60px_-15px_rgba(244,63,94,0.15)] relative overflow-hidden animate-scale-up">
             
             {/* Top Premium Color Stripe */}
@@ -1213,7 +1361,7 @@ export default function App() {
                         <span>Panduan Otorisasi Domain</span>
                       </div>
                       <p className="leading-relaxed text-[9.5px]">
-                        Supaya Google Auth berfungsi di domain <strong>evova-studio</strong> &amp; testing server, pastikan Anda telah memasukkan daftar domain berikut ke <strong>Authentication › Settings › Authorized Domains</strong> di Firebase Console Anda:
+                        Supaya Google Auth berfungsi di domain <strong>evova-wedding</strong> &amp; testing server, pastikan Anda telah memasukkan daftar domain berikut ke <strong>Authentication › Settings › Authorized Domains</strong> di Firebase Console Anda:
                       </p>
                       
                       <div className="space-y-1.5 text-[9px] font-mono">
@@ -1242,42 +1390,42 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* evova-studio web app */}
+                        {/* evova-wedding web app */}
                         <div className="bg-white border border-slate-150 p-1.5 rounded-lg space-y-1">
                           <span className="text-[7.5px] text-slate-450 font-sans font-bold uppercase tracking-wider">Domain Production (Firebase Hosting):</span>
                           <div className="flex items-center justify-between gap-1">
-                            <span className="truncate max-w-[170px] select-all text-slate-700 font-semibold">evova-studio.web.app</span>
+                            <span className="truncate max-w-[170px] select-all text-slate-700 font-semibold">evova-wedding.web.app</span>
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText("evova-studio.web.app");
-                                setCopiedDomainText("evova-studio.web.app");
+                                navigator.clipboard.writeText("evova-wedding.web.app");
+                                setCopiedDomainText("evova-wedding.web.app");
                                 setTimeout(() => setCopiedDomainText(null), 2000);
                               }}
                               className="p-1 hover:bg-slate-50 border border-slate-150 rounded text-slate-500 hover:text-slate-800 transition cursor-pointer shrink-0"
                               title="Salin Domain"
                             >
-                              {copiedDomainText === "evova-studio.web.app" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
+                              {copiedDomainText === "evova-wedding.web.app" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
                             </button>
                           </div>
                         </div>
 
-                        {/* evova-studio firebaseapp */}
+                        {/* evova-wedding firebaseapp */}
                         <div className="bg-white border border-slate-150 p-1.5 rounded-lg space-y-1">
                           <span className="text-[7.5px] text-slate-450 font-sans font-bold uppercase tracking-wider">Domain Auth Default:</span>
                           <div className="flex items-center justify-between gap-1">
-                            <span className="truncate max-w-[170px] select-all text-slate-700 font-semibold">evova-studio.firebaseapp.com</span>
+                            <span className="truncate max-w-[170px] select-all text-slate-700 font-semibold">evova-wedding.firebaseapp.com</span>
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText("evova-studio.firebaseapp.com");
-                                setCopiedDomainText("evova-studio.firebaseapp.com");
+                                navigator.clipboard.writeText("evova-wedding.firebaseapp.com");
+                                setCopiedDomainText("evova-wedding.firebaseapp.com");
                                 setTimeout(() => setCopiedDomainText(null), 2000);
                               }}
                               className="p-1 hover:bg-slate-50 border border-slate-150 rounded text-slate-500 hover:text-slate-800 transition cursor-pointer shrink-0"
                               title="Salin Domain"
                             >
-                              {copiedDomainText === "evova-studio.firebaseapp.com" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
+                              {copiedDomainText === "evova-wedding.firebaseapp.com" ? <Check className="w-3 h-3 text-emerald-600" /> : <Clipboard className="w-3 h-3" />}
                             </button>
                           </div>
                         </div>
@@ -1327,7 +1475,7 @@ export default function App() {
 
                       <div className="pt-1.5">
                         <a
-                          href="https://console.firebase.google.com/project/evova-studio/authentication/settings"
+                          href="https://console.firebase.google.com/project/evova-wedding/authentication/settings"
                           target="_blank"
                           rel="noreferrer"
                           className="w-full inline-flex items-center justify-center gap-1 py-1.5 bg-rose-50 border border-rose-100/45 hover:bg-rose-100 hover:text-rose-800 text-rose-600 font-bold rounded-lg text-[9px] uppercase tracking-wider transition-all cursor-pointer"
@@ -1355,17 +1503,22 @@ export default function App() {
                     setResetSuccessMessage("");
 
                     if (!resetEmail.trim()) {
-                      setLoginError("Email wajib diisi!");
+                      const errText = "Email wajib diisi!";
+                      setLoginError(errText);
+                      showToast(errText, "error");
                       return;
                     }
 
                     try {
                       await sendPasswordResetEmail(auth, resetEmail.trim());
                       setResetSuccessMessage(`Tautan pemulihan berhasil dikirim ke ${resetEmail.trim()}. Silakan cek Gmail Anda.`);
+                      showToast(`Tautan atur ulang kata sandi telah terkirim ke alamat email Anda.`, "success");
                       setResetEmail("");
                     } catch (err: any) {
                       console.error("Gagal mengirim email reset:", err);
-                      setLoginError("Email tidak ditemukan atau tidak valid.");
+                      const friendlyErr = translateAuthError(err.code, "Email tidak terdaftar atau format penulisan salah.");
+                      setLoginError(friendlyErr);
+                      showToast(friendlyErr, "error");
                     }
                   }}
                   className="space-y-4 animate-fade-in"
@@ -1421,18 +1574,22 @@ export default function App() {
                       try {
                         const res = await googleSignIn();
                         addLog(res.user.email || "GOOGLE", "Login Google", "SUKSES", `Pengguna berhasil login menggunakan Google Auth.`);
+                        showToast(`Masuk dengan akun Google berhasil! Selamat datang.`, "success");
                         setShowLoginModal(false);
                         setIsDomainError(false);
                       } catch (err: any) {
                         console.error("Kesalahan Google Auth:", err);
                         const errMsg = err?.message || String(err);
+                        const friendlyErr = translateAuthError(err?.code, "Gagal masuk dengan Google: " + errMsg);
+                        
                         if (err?.code === "auth/unauthorized-domain" || errMsg.includes("unauthorized-domain")) {
                           setIsDomainError(true);
                           setLoginError("Domain ini belum diotorisasi di Konsol Firebase Anda.");
                         } else {
                           setIsDomainError(false);
-                          setLoginError("Gagal masuk dengan Google: " + errMsg);
+                          setLoginError(friendlyErr);
                         }
+                        showToast(friendlyErr, "error");
                       }
                     }}
                     className="w-full py-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-bold rounded-xl transition-all duration-200 text-xs flex items-center justify-center gap-2.5 cursor-pointer shadow-xs"
@@ -1473,17 +1630,22 @@ export default function App() {
                       setResetSuccessMessage("");
 
                       if (!loginUsername.trim() || !loginPassword) {
-                        setLoginError("Email dan password wajib diisi!");
+                        const errText = "Email dan password wajib diisi!";
+                        setLoginError(errText);
+                        showToast(errText, "error");
                         return;
                       }
 
                       try {
                         await signInWithEmailAndPassword(auth, loginUsername.trim(), loginPassword);
                         addLog(loginUsername.trim(), "Login User", "SUKSES", `Pengguna dengan email ${loginUsername.trim()} berhasil masuk.`);
+                        showToast("Sesi Anda berhasil dimulai! Selamat datang kembali.", "success");
                         setShowLoginModal(false);
                       } catch (err: any) {
                         console.error("Gagal login:", err);
-                        setLoginError("Email atau password Anda salah atau tidak terdaftar.");
+                        const friendlyErr = translateAuthError(err.code, "Email atau kata sandi Anda salah atau tidak terdaftar.");
+                        setLoginError(friendlyErr);
+                        showToast(friendlyErr, "error");
                         addLog(loginUsername.trim(), "Gagal Login", "GAGAL", err.message || "Email atau password salah.");
                       }
                     }}
@@ -1562,12 +1724,16 @@ export default function App() {
                     setLoginError("");
 
                     if (!registerName.trim() || !registerEmail.trim() || !registerPassword) {
-                      setLoginError("Semua kolom registrasi wajib diisi!");
+                      const errText = "Semua kolom registrasi wajib diisi!";
+                      setLoginError(errText);
+                      showToast(errText, "error");
                       return;
                     }
 
                     if (registerPassword.length < 6) {
-                      setLoginError("Sandi minimal terdiri dari 6 karakter!");
+                      const errText = "Sandi harus minimal terdiri dari 6 karakter!";
+                      setLoginError(errText);
+                      showToast(errText, "error");
                       return;
                     }
 
@@ -1615,6 +1781,7 @@ export default function App() {
                       }
 
                       addLog(registerEmail.trim(), "Registrasi Akun Baru", "SUKSES", `Berhasil mendaftarkan akun ${registerRole} bernama ${registerName}.`);
+                      showToast(`Registrasi sukses! Selamat bergabung di EVOVA, ${registerName}.`, "success");
                       setIsRegisterMode(false);
                       setShowLoginModal(false);
                       setLoginError("");
@@ -1626,7 +1793,9 @@ export default function App() {
                       setShowPassword(false);
                     } catch (err: any) {
                       console.error("Gagal melakukan registrasi:", err);
-                      setLoginError(err.message || "Registrasi gagal dibatalkan. Kemungkinan email telah digunakan.");
+                      const friendlyErr = translateAuthError(err.code, "Registrasi gagal dibatalkan. Kemungkinan email telah digunakan.");
+                      setLoginError(friendlyErr);
+                      showToast(friendlyErr, "error");
                       addLog(registerEmail.trim(), "Gagal Registrasi", "GAGAL", err.message || "Gagal membuat akun.");
                     }
                   }}
@@ -1732,6 +1901,55 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Floating System Toast Alerts */}
+      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3.5 max-w-sm w-full font-sans pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 30, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className={`p-4 rounded-2xl shadow-xl border flex gap-3 items-start pointer-events-auto backdrop-blur-md relative overflow-hidden transition-all duration-200 ${
+                toast.type === "success"
+                  ? "bg-emerald-50/95 border-emerald-100 text-emerald-800"
+                  : toast.type === "error"
+                  ? "bg-rose-50/95 border-rose-100 text-rose-800"
+                  : "bg-slate-900/95 border-slate-800 text-white"
+              }`}
+            >
+              <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                toast.type === "success" ? "bg-emerald-500" : toast.type === "error" ? "bg-rose-500" : "bg-indigo-500"
+              }`} />
+
+              <div className="pt-0.5">
+                {toast.type === "success" ? (
+                  <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                ) : toast.type === "error" ? (
+                  <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                ) : (
+                  <Info className="w-5 h-5 text-indigo-400 shrink-0" />
+                )}
+              </div>
+
+              <div className="flex-1 space-y-0.5">
+                <h5 className="text-[9px] font-extrabold uppercase tracking-widest opacity-80 leading-tight">
+                  {toast.type === "success" ? "Sukses" : toast.type === "error" ? "Kesalahan" : "Informasi"}
+                </h5>
+                <p className="text-xs leading-relaxed font-medium">{toast.message}</p>
+              </div>
+
+              <button
+                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-lg hover:bg-slate-200/20"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
     </div>
   );

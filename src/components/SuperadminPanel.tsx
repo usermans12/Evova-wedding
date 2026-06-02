@@ -25,6 +25,7 @@ interface SuperadminPanelProps {
   onClearLogs: () => void;
   onDeleteStorageFile: (id: string) => void;
   onSelectClientForEdit: (clientId: string) => void;
+  onPreviewClient?: (data: WeddingData) => void;
   currentUser: string;
   addLog: (userName: string, activity: string, status: "SUKSES" | "GAGAL" | "INFO", description: string) => void;
 }
@@ -41,10 +42,20 @@ export default function SuperadminPanel({
   onClearLogs,
   onDeleteStorageFile,
   onSelectClientForEdit,
+  onPreviewClient,
   currentUser,
   addLog
 }: SuperadminPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<"clients" | "templates" | "features" | "logs" | "storage" | "analytics">("clients");
+
+  // Local premium toast notification state
+  const [localToast, setLocalToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const triggerToast = (message: string, type: "success" | "error" | "info" = "info") => {
+    setLocalToast({ message, type });
+    setTimeout(() => {
+      setLocalToast(prev => prev?.message === message ? null : prev);
+    }, 4500);
+  };
 
   // Client Management States
   const [clientSearch, setClientSearch] = useState("");
@@ -100,25 +111,25 @@ export default function SuperadminPanel({
   const handleCreateClientSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientFormName || !clientFormUsername || !clientFormPassword) {
-      alert("Harap lengkapi semua field wajib!");
+      triggerToast("Harap lengkapi semua field wajib!", "error");
       return;
     }
 
     const trimmedUsername = clientFormUsername.toLowerCase().trim();
 
     if (trimmedUsername.length === 0) {
-      alert("Username tidak valid!");
+      triggerToast("Username tidak valid!", "error");
       return;
     }
 
     if (clients.some(c => c.username.toLowerCase() === trimmedUsername)) {
       addLog(currentUser, "Create Client", "GAGAL", `Username "${clientFormUsername}" sudah digunakan.`);
-      alert("Username sudah terdaftar! Harap gunakan username lain.");
+      triggerToast("Username sudah terdaftar! Harap gunakan username lain.", "error");
       return;
     }
 
     if (clientFormPassword.length < 6) {
-      alert("Password minimal 6 karakter!");
+      triggerToast("Password minimal 6 karakter!", "error");
       return;
     }
 
@@ -198,17 +209,17 @@ export default function SuperadminPanel({
 
     const trimmedUsername = clientFormUsername.toLowerCase().trim();
     if (trimmedUsername.length === 0) {
-      alert("Username tidak valid!");
+      triggerToast("Username tidak valid!", "error");
       return;
     }
 
     if (clients.some(c => c.id !== selectedClient.id && c.username.toLowerCase() === trimmedUsername)) {
-      alert("Username sudah terdaftar! Harap gunakan username lain.");
+      triggerToast("Username sudah terdaftar! Harap gunakan username lain.", "error");
       return;
     }
 
     if (clientFormPassword && clientFormPassword.length < 6) {
-      alert("Password baru minimal 6 karakter!");
+      triggerToast("Password baru minimal 6 karakter!", "error");
       return;
     }
 
@@ -275,7 +286,7 @@ export default function SuperadminPanel({
       });
       onUpdateClients(updated);
       addLog(currentUser, "Reset Password", "SUKSES", `Password untuk klien "${client.name}" di-reset secara manual.`);
-      alert("Password berhasil diubah!");
+      triggerToast("Password berhasil diubah!", "success");
     }
   };
 
@@ -283,7 +294,7 @@ export default function SuperadminPanel({
   const handleCreateTemplate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!templateFormName || !templateFormTheme) {
-      alert("Field nama dan theme class wajib diisi!");
+      triggerToast("Field nama dan theme class wajib diisi!", "error");
       return;
     }
 
@@ -558,7 +569,7 @@ export default function SuperadminPanel({
                               onClick={() => {
                                 const url = `${window.location.origin}/wedding/${client.slug}`;
                                 navigator.clipboard.writeText(url);
-                                alert("✓ Link permanen disalin: " + url);
+                                triggerToast("✓ Link permanen berhasil disalin!", "success");
                               }}
                               className="text-[10px] text-slate-600 hover:text-slate-900 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 font-mono cursor-pointer transition flex items-center gap-1 inline-block"
                               title="Salin Link Permanen"
@@ -609,13 +620,25 @@ export default function SuperadminPanel({
                         )}
                       </td>
                       <td className="p-4 text-center">
-                        <button
-                          onClick={() => onSelectClientForEdit(client.id)}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-900 hover:text-white transition rounded-lg text-[10px] font-bold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <Eye className="w-3 h-3" />
-                          Buka Kelola Draf
-                        </button>
+                        <div className="flex flex-col gap-1 items-center justify-center">
+                          <button
+                            onClick={() => onSelectClientForEdit(client.id)}
+                            className="w-[124px] px-2 py-1 bg-slate-100 hover:bg-slate-900 hover:text-white transition rounded-lg text-[9px] font-bold text-slate-700 flex items-center justify-center gap-1 cursor-pointer"
+                            title="Buka form editor untuk mengubah draf undangan ini"
+                          >
+                            <Edit className="w-2.5 h-2.5" />
+                            Kelola Draf (Edit)
+                          </button>
+                          
+                          <button
+                            onClick={() => onPreviewClient?.(client.data)}
+                            className="w-[124px] px-2 py-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-700 transition rounded-lg text-[9px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                            title="Buka simulasi preview rancangan undangan"
+                          >
+                            <Eye className="w-2.5 h-2.5" />
+                            Preview (Lihat)
+                          </button>
+                        </div>
                       </td>
                       <td className="p-4 text-right space-x-1.5">
                         <button
@@ -1117,9 +1140,9 @@ export default function SuperadminPanel({
                       if (confirmationValue === "RESET-EVOVA" || confirmationValue === "'RESET-EVOVA'") {
                          onUpdateClients([]);
                          onClearLogs();
-                         alert("System Reset Berhasil! Sistem EVOVA sekarang benar-benar kosong, bersih, dan 100% siap production.");
+                         triggerToast("System Reset Berhasil! Sistem EVOVA sekarang benar-benar bersih & siap production.", "success");
                       } else {
-                         alert("Konfirmasi batal. Teks konfirmasi salah.");
+                         triggerToast("Konfirmasi batal. Teks konfirmasi salah.", "error");
                       }
                     }
                   }}
@@ -1481,6 +1504,29 @@ export default function SuperadminPanel({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Modern, high-contrast, non-blocking toast overlay */}
+      {localToast && (
+        <div 
+          className="fixed bottom-6 right-6 z-[9999] p-4 rounded-2xl shadow-xl border flex items-center gap-3 text-xs font-semibold max-w-sm transition-all duration-300 animate-slide-up"
+          style={{
+            contentVisibility: "auto",
+            backgroundColor: localToast.type === "success" ? "#ecfdf5" : localToast.type === "error" ? "#fef2f2" : "#eff6ff",
+            borderColor: localToast.type === "success" ? "#10b981" : localToast.type === "error" ? "#ef4444" : "#3b82f6",
+            color: localToast.type === "success" ? "#065f46" : localToast.type === "error" ? "#991b1b" : "#1e40af"
+          }}
+        >
+          <span>{localToast.type === "success" ? "✅" : localToast.type === "error" ? "❌" : "ℹ️"}</span>
+          <span className="flex-1 leading-relaxed">{localToast.message}</span>
+          <button 
+            type="button"
+            onClick={() => setLocalToast(null)} 
+            className="font-bold hover:scale-105 active:scale-95 transition cursor-pointer ml-1 p-0.5"
+          >
+            ✕
+          </button>
         </div>
       )}
 
