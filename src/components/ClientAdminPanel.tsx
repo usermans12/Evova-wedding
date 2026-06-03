@@ -25,9 +25,10 @@ interface ClientAdminPanelProps {
   activeTemplates: TemplatePreset[];
   onUploadFileToStorage: (name: string, size: string, fileType: string, url: string) => void;
   onPreviewClick: (data: WeddingData) => void;
-  onClientDataChange: (clientId: string, newData: WeddingData) => void;
+  onClientDataChange: (clientId: string, newData: WeddingData, forceImmediate?: boolean) => void;
   loggedClient: ClientAccount;
   onLogout: () => void;
+  syncStatus?: "Saved" | "Saving... " | "Saving...";
 }
 
 export default function ClientAdminPanel({
@@ -37,7 +38,8 @@ export default function ClientAdminPanel({
   onPreviewClick,
   onClientDataChange,
   loggedClient,
-  onLogout
+  onLogout,
+  syncStatus = "Saved"
 }: ClientAdminPanelProps) {
   const activeClient = loggedClient;
   const clientData = activeClient?.data || defaultWeddingData;
@@ -99,8 +101,8 @@ export default function ClientAdminPanel({
     onLogout();
   };
 
-  const handleDataChange = (updatedData: WeddingData) => {
-    onClientDataChange(activeClient.id, updatedData);
+  const handleDataChange = (updatedData: WeddingData, forceImmediate?: boolean) => {
+    onClientDataChange(activeClient.id, updatedData, forceImmediate);
   };
 
   const handleDeleteWish = async (wishId: string) => {
@@ -362,6 +364,16 @@ export default function ClientAdminPanel({
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider font-mono">Draf Aktif</span>
+            
+            {/* Real-time Cloud Sync Status */}
+            <span className={`px-2 py-0.5 text-[9px] font-extrabold rounded-full font-mono flex items-center gap-1 border transition-all duration-300 ${
+              syncStatus.trim().toUpperCase() === "SAVED"
+                ? "bg-emerald-55 text-emerald-700 border-emerald-250" 
+                : "bg-amber-50 text-amber-600 border-amber-200 animate-pulse"
+            }`}>
+              <Cloud className={`w-3 h-3 ${syncStatus.trim().toUpperCase() === "SAVED" ? "animate-none" : "animate-bounce"}`} />
+              {syncStatus.toUpperCase()}
+            </span>
           </div>
           <h1 className="text-xl font-serif font-bold text-slate-800 leading-tight">
             Dashboard Pengantin: {activeClient.name}

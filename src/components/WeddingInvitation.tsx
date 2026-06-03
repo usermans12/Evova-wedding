@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { WeddingData, GuestWish, GlobalFeatureToggles } from "../types";
 import { getTheme } from "../themes";
 import { safeLocalStorage, validateGoogleMapsUrl } from "../utils";
@@ -6,7 +6,7 @@ import {
   Heart, Calendar, MapPin, Clock, Copy, Map, ChevronLeft, 
   ChevronRight, X, Gift, Volume2, VolumeX, MessageSquare, Send, Check,
   Image as ImageIcon, Share2, Facebook, MessageCircle, Users, UserCheck, UserX,
-  HelpCircle, Sparkles, HeartHandshake, Compass, Music, ArrowUpDown, Search
+  HelpCircle, Sparkles, HeartHandshake, Compass, Music, ArrowUpDown, Search, Play
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeVectorDecor, PremiumVectorQR } from "./ThemeVectorDecor";
@@ -386,6 +386,53 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
   
   const [isOpen, setIsOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [interactionUnlocked, setInteractionUnlocked] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+        const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+        const isMobileUA = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+        const isSmallScreen = window.innerWidth < 768;
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        setIsMobile(isMobileUA || isSmallScreen || isTouch);
+      }
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handleUnlockInteraction = () => {
+    setInteractionUnlocked(true);
+    setIsPlaying(true);
+
+    // Early human touch trigger to bypass tight sandbox and autoplay audio restrictions
+    const hasBase64Audio = !!data.customAudioBase64;
+    const isYouTube = !hasBase64Audio && isYouTubeUrl(data.customAudioUrl);
+    const isSpotify = !hasBase64Audio && isSpotifyUrl(data.customAudioUrl);
+
+    if (!isYouTube && !isSpotify) {
+      if (hiddenAudioRef.current) {
+        audioRef.current = hiddenAudioRef.current;
+      }
+
+      if (!audioRef.current) {
+        const audioUrl = resolvedAudioUrl;
+        audioRef.current = new Audio(audioUrl);
+        audioRef.current.preload = "auto";
+        audioRef.current.loop = true;
+      }
+      
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.warn("Autoplay interaction fallback failed:", err);
+        });
+      }
+    }
+  };
   const [showSpotifyPlayer, setShowSpotifyPlayer] = useState(false);
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -420,6 +467,48 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
     }
   }, []);
 
+  // Convert custom base64 audio to a highly lightweight Blob URL once to prevent mobile players from choking on OOM loading
+  const resolvedAudioUrl = useMemo(() => {
+    const rawUrl = data.customAudioBase64 || data.customAudioUrl || "https://assets.mixkit.co/music/preview/mixkit-delicate-piano-372.mp3";
+    if (rawUrl && rawUrl.startsWith("data:")) {
+      try {
+        const parts = rawUrl.split(",");
+        const mime = parts[0].match(/:(.*?);/)?.[1] || "audio/mpeg";
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        return URL.createObjectURL(blob);
+      } catch (err) {
+        console.error("Gagal dekompresi data-URI base64 ke Blob URL:", err);
+        return rawUrl;
+      }
+    }
+    return rawUrl;
+  }, [data.customAudioBase64, data.customAudioUrl]);
+
+  // Clean up Blob URLs on unmount to prevent browser memory leaks
+  useEffect(() => {
+    return () => {
+      if (resolvedAudioUrl && resolvedAudioUrl.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(resolvedAudioUrl);
+        } catch (err) {
+          console.warn("Gagal me-revoke Blob URL:", err);
+        }
+      }
+    };
+  }, [resolvedAudioUrl]);
+
+  // Separate groom (idx 0), bride (idx 1), and cover (idx 4) photos from public prewedding gallery slideshow
+  const galleryImages = useMemo(() => {
+    if (!data.images || data.images.length === 0) return [];
+    return data.images.filter((_, idx) => idx !== 0 && idx !== 1 && idx !== 4);
+  }, [data.images]);
+
   const heroImages = data.images && data.images.length > 0 
     ? data.images.slice(0, Math.min(data.images.length, 3)) 
     : [defaultImages[0]];
@@ -434,6 +523,7 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
 
   // Audio elements
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hiddenAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -551,20 +641,23 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
       return;
     }
 
-    const audioUrl = data.customAudioBase64 || data.customAudioUrl || "https://assets.mixkit.co/music/preview/mixkit-delicate-piano-372.mp3";
-    
     // Stop and clean up previous audio element if source changes
-    if (audioRef.current) {
+    if (audioRef.current && audioRef.current !== hiddenAudioRef.current) {
       audioRef.current.pause();
     }
     
-    const audio = new Audio(audioUrl);
-    audio.preload = "auto";
-    audio.loop = true;
-    audioRef.current = audio;
+    if (hiddenAudioRef.current) {
+      audioRef.current = hiddenAudioRef.current;
+    } else {
+      const audioUrl = resolvedAudioUrl;
+      const audio = new Audio(audioUrl);
+      audio.preload = "auto";
+      audio.loop = true;
+      audioRef.current = audio;
+    }
 
-    if (isOpen && isPlaying) {
-      audio.play().catch(e => console.log("Audio play postponed until context interaction:", e));
+    if (isOpen && isPlaying && audioRef.current) {
+      audioRef.current.play().catch(e => console.log("Audio play postponed until context interaction:", e));
     }
 
     return () => {
@@ -572,7 +665,7 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
         audioRef.current.pause();
       }
     };
-  }, [data.customAudioUrl, data.customAudioBase64]);
+  }, [data.customAudioUrl, data.customAudioBase64, resolvedAudioUrl]);
 
   // Handle active play / pause toggling cleanly without recreating the Audio instance
   useEffect(() => {
@@ -586,6 +679,42 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
       audioRef.current.pause();
     }
   }, [isOpen, isPlaying]);
+
+  // iOS & Chrome Mobile specialized re-trigger playback on the first touch event after User Interaction Lock overlay is dismissed
+  useEffect(() => {
+    if (!interactionUnlocked) return;
+
+    const forcePlayOnFirstPostDismissTouch = () => {
+      const hasBase64Audio = !!data.customAudioBase64;
+      const isYouTube = !hasBase64Audio && isYouTubeUrl(data.customAudioUrl);
+      const isSpotify = !hasBase64Audio && isSpotifyUrl(data.customAudioUrl);
+
+      if (!isYouTube && !isSpotify && isPlaying) {
+        const audio = hiddenAudioRef.current || audioRef.current;
+        if (audio && audio.paused) {
+          audio.play()
+            .then(() => {
+              console.log("Audio successfully forced played on post-dismiss touch event!");
+            })
+            .catch(err => {
+              console.warn("Failsafe post-dismiss touch play failed:", err);
+            });
+        }
+      }
+      
+      // Clean up touch event handler after the first touch
+      window.removeEventListener("touchstart", forcePlayOnFirstPostDismissTouch);
+      window.removeEventListener("click", forcePlayOnFirstPostDismissTouch);
+    };
+
+    window.addEventListener("touchstart", forcePlayOnFirstPostDismissTouch, { passive: true });
+    window.addEventListener("click", forcePlayOnFirstPostDismissTouch, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", forcePlayOnFirstPostDismissTouch);
+      window.removeEventListener("click", forcePlayOnFirstPostDismissTouch);
+    };
+  }, [interactionUnlocked, isPlaying, data.customAudioUrl, data.customAudioBase64]);
 
   // Robust interaction fallback to query and force play background music if user interacts anyway
   useEffect(() => {
@@ -618,19 +747,13 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
     }
     
     if (!isYouTube && !isSpotify) {
-      const audioUrl = data.customAudioBase64 || data.customAudioUrl || "https://assets.mixkit.co/music/preview/mixkit-delicate-piano-372.mp3";
-      
-      // Stop and replace any passive background audio element with a gesture-unlocked one
-      if (audioRef.current) {
-        audioRef.current.pause();
+      if (!audioRef.current) {
+        audioRef.current = new Audio(resolvedAudioUrl);
+        audioRef.current.preload = "auto";
+        audioRef.current.loop = true;
       }
       
-      const audio = new Audio(audioUrl);
-      audio.preload = "auto";
-      audio.loop = true;
-      audioRef.current = audio;
-      
-      const playPromise = audio.play();
+      const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch(err => {
           console.log("Audio play gesture failed, retrying on window interaction:", err);
@@ -748,13 +871,13 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
   const handlePrevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (activeImageIndex === null) return;
-    setActiveImageIndex(activeImageIndex === 0 ? data.images.length - 1 : activeImageIndex - 1);
+    setActiveImageIndex(activeImageIndex === 0 ? galleryImages.length - 1 : activeImageIndex - 1);
   };
 
   const handleNextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (activeImageIndex === null) return;
-    setActiveImageIndex(activeImageIndex === data.images.length - 1 ? 0 : activeImageIndex + 1);
+    setActiveImageIndex(activeImageIndex === galleryImages.length - 1 ? 0 : activeImageIndex + 1);
   };
 
   // Aesthetic backgrounds
@@ -862,6 +985,121 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
         fontFamily: activeTheme.fontBodyFamily
       }}
     >
+      {/* Hidden constant audio preloader element */}
+      <audio 
+        ref={hiddenAudioRef}
+        key={resolvedAudioUrl}
+        src={resolvedAudioUrl}
+        preload="auto"
+        loop
+        className="hidden pointer-events-none absolute w-0 h-0 opacity-0 -z-50"
+        style={{ display: "none" }}
+      />
+
+      {/* USER INTERACTION LOCK OVERLAY FOR MOBILE AUTOPLAY BYPASS */}
+      <AnimatePresence>
+        {isMobile && !interactionUnlocked && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.6, ease: "easeInOut" }}
+            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center p-6 text-center overflow-hidden"
+            style={{
+              backgroundColor: '#0c0f16',
+            }}
+          >
+            {/* Blurry Background image to match the romantic vibe */}
+            {coverPhotoBg && (
+              <div 
+                className="absolute inset-0 bg-cover bg-center scale-110 opacity-30 blur-xl pointer-events-none"
+                style={{ backgroundImage: `url(${coverPhotoBg})` }}
+              />
+            )}
+            
+            {/* Subtle floating vector decoration wash */}
+            <div className="absolute inset-x-0 bottom-0 top-0 bg-radial-gradient from-transparent via-slate-950/80 to-slate-950/98 pointer-events-none" />
+
+            {/* Main glassmorphism card */}
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.15, duration: 0.8, ease: "easeOut" }}
+              className="relative max-w-sm w-full bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 md:p-10 shadow-3xl text-center space-y-7 z-10 flex flex-col items-center justify-center overflow-hidden"
+              style={{
+                boxShadow: "0 30px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)"
+              }}
+            >
+              {/* Elegant Gold Trim Lines top and bottom of card */}
+              <div 
+                className="absolute top-4 inset-x-12 h-[1px]" 
+                style={{ backgroundImage: `linear-gradient(to right, transparent, ${coverStyle.borderColor || 'rgba(212, 175, 55, 0.3)'}, transparent)` }}
+              />
+              <div 
+                className="absolute bottom-4 inset-x-12 h-[1px]" 
+                style={{ backgroundImage: `linear-gradient(to right, transparent, ${coverStyle.borderColor || 'rgba(212, 175, 55, 0.3)'}, transparent)` }}
+              />
+
+              {/* Pulsing heart and music combo container */}
+              <div className="relative flex items-center justify-center">
+                <div className="absolute -inset-4 rounded-full bg-primary-500/10 animate-ping opacity-45" style={{ backgroundColor: `${coverStyle.indicatorColor}20` }} />
+                <div className="w-16 h-16 rounded-full border border-white/15 bg-white/5 flex items-center justify-center relative shadow-inner">
+                  <Music className="w-6 h-6 animate-spin-slow text-white" style={{ color: coverStyle.indicatorColor }} />
+                  <Heart className="w-3.5 h-3.5 fill-red-500 text-red-500 absolute bottom-1 right-1 animate-pulse" />
+                </div>
+              </div>
+
+              {/* Header Title */}
+              <div className="space-y-1.5 select-none">
+                <span className="text-[10px] tracking-[0.3em] font-bold text-white/50 uppercase block font-sans">
+                  The Wedding Invitation of
+                </span>
+                <span className="text-white/30 font-mono text-[8px] tracking-widest uppercase block">
+                  WALIMATUL 'URS
+                </span>
+              </div>
+
+              {/* Names of Groom & Bride */}
+              <h2 
+                className="text-3xl md:text-4xl text-white font-extralight py-2 px-1 tracking-wide leading-tight flex flex-col gap-1 items-center"
+                style={{ fontFamily: activeTheme.fontHeadingFamily }}
+              >
+                <span className="capitalize font-script text-white drop-shadow-sm">
+                  {formatNameForScript(data.groomNick || data.groomName.split(" ")[0])}
+                </span>
+                <span className="text-sm font-serif italic text-white/40 my-0.5">&amp;</span>
+                <span className="capitalize font-script text-white drop-shadow-sm">
+                  {formatNameForScript(data.brideNick || data.brideName.split(" ")[0])}
+                </span>
+              </h2>
+
+              {/* The main elegant play button */}
+              <div className="w-full pt-2">
+                <button
+                  onClick={handleUnlockInteraction}
+                  className="w-full relative py-4 rounded-full font-bold text-[10px] md:text-xs tracking-[0.2em] uppercase text-white shadow-2xl transition-all duration-500 hover:scale-[1.03] active:scale-[0.97] cursor-pointer overflow-hidden border flex items-center justify-center gap-2 group"
+                  style={{
+                    background: coverStyle.btnBg,
+                    borderColor: coverStyle.borderColor
+                  }}
+                >
+                  <Play className="w-4 h-4 fill-current text-white animate-pulse" />
+                  <span className="relative z-10 font-bold font-sans">PLAY & START INVITATION</span>
+                </button>
+                
+                <span className="text-[9px] tracking-[0.1em] font-bold text-white/40 mt-2 block uppercase font-sans">
+                  PUTAR MUSIK & BUKA UNDANGAN
+                </span>
+              </div>
+
+              {/* Description message */}
+              <p className="text-[10px] md:text-[11px] leading-relaxed text-white/50 font-light max-w-xs px-3">
+                Ketuk tombol untuk memulai alunan musik latar romantis & menyajikan seluruh keindahan visual undangan pernikahan ini.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* HIGH-END TOAST MESSAGE */}
       <AnimatePresence>
         {showToast && (
@@ -1405,8 +1643,8 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
                   midColor={midColor} 
                 />
 
-                <div className="relative z-10 space-y-1.5 pt-2">
-                  <h3 className="text-xl font-bold tracking-wide font-serif" style={{ color: activeTheme.headingColor }}>
+                <div className="relative z-10 space-y-1.5 pt-2 px-4">
+                  <h3 className="text-lg md:text-xl font-bold tracking-wide leading-snug font-serif break-words" style={{ color: activeTheme.headingColor }}>
                     {`${data.groomTitleFront ? data.groomTitleFront.trim() + " " : ""}${data.groomName}${data.groomTitleBack ? ", " + data.groomTitleBack.trim() : (data.groomTitle ? ", " + data.groomTitle.trim() : "")}`}
                   </h3>
                 </div>
@@ -1444,8 +1682,8 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
                   midColor={midColor} 
                 />
 
-                <div className="relative z-10 space-y-1.5 pt-2">
-                  <h3 className="text-xl font-bold tracking-wide font-serif" style={{ color: activeTheme.headingColor }}>
+                <div className="relative z-10 space-y-1.5 pt-2 px-4">
+                  <h3 className="text-lg md:text-xl font-bold tracking-wide leading-snug font-serif break-words" style={{ color: activeTheme.headingColor }}>
                     {`${data.brideTitleFront ? data.brideTitleFront.trim() + " " : ""}${data.brideName}${data.brideTitleBack ? ", " + data.brideTitleBack.trim() : (data.brideTitle ? ", " + data.brideTitle.trim() : "")}`}
                   </h3>
                 </div>
@@ -1678,7 +1916,7 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
           </section>
 
           {/* PART 5: MASONRY PRESET GALLERY & LIGHTBOX */}
-          {data.images.length > 0 && (!globalToggles || globalToggles.gallery) && (
+          {galleryImages.length > 0 && (!globalToggles || globalToggles.gallery) && (
             <section id="invite-section-galeri" className="space-y-6 animate-fade-in">
               <div className="text-center space-y-1">
                 <span className="text-[10px] tracking-[0.3em] font-bold" style={{ color: midColor }}>Momen Indah Kedua Mempelai</span>
@@ -1690,23 +1928,23 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
 
               {/* MODULAR PHOTO GALLERY CAROUSEL PER SELECTED THEME */}
               {activeTheme.id === "theme-nusantara-luxury" ? (
-                <NusantaraGallery images={data.images} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
+                <NusantaraGallery images={galleryImages} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
               ) : activeTheme.id === "theme-fairytale-moonlight-blue" ? (
-                <FairytaleGallery images={data.images} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
+                <FairytaleGallery images={galleryImages} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
               ) : activeTheme.id === "theme-royal-black-gold" ? (
-                <RoyalGallery images={data.images} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
+                <RoyalGallery images={galleryImages} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
               ) : activeTheme.id === "theme-sage-botanical" ? (
-                <SageGallery images={data.images} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
+                <SageGallery images={galleryImages} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
               ) : activeTheme.id === "theme-blush-pink-rose" ? (
-                <BlushPinkGallery images={data.images} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
+                <BlushPinkGallery images={galleryImages} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
               ) : activeTheme.id === "theme-royal-red-imperial" ? (
-                <RoyalCrimsonGallery images={data.images} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
+                <RoyalCrimsonGallery images={galleryImages} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
               ) : activeTheme.id === "theme-blue-hydrangea" ? (
-                <BlueHydrangeaGallery images={data.images} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
+                <BlueHydrangeaGallery images={galleryImages} setActiveImageIndex={setActiveImageIndex} LazyImage={LazyImage} />
               ) : (
                 /* Standard Fallback Masonry Gallery */
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5 px-0.5 masonry-gallery">
-                  {data.images.map((img, i) => (
+                  {galleryImages.map((img, i) => (
                     <motion.div 
                       key={i} 
                       initial={{ opacity: 0, y: 50, scale: 0.97, filter: "blur(8px)" }}
@@ -2296,14 +2534,14 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
             {/* High-quality display frame */}
             <div className="max-w-2xl max-h-[80vh] overflow-hidden rounded-2xl relative border border-white/10 bg-slate-950" onClick={(e) => e.stopPropagation()}>
               <LazyImage 
-                src={data.images[activeImageIndex]} 
+                src={galleryImages[activeImageIndex]} 
                 alt={`Lightbox view ${activeImageIndex}`}
                 containerClassName="relative w-full max-h-[85vh] overflow-hidden flex items-center justify-center rounded-2xl"
                 className="max-w-full max-h-[85vh] object-contain mx-auto"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-1.5 bg-black/60 backdrop-blur-xs text-white rounded-full text-[10px] font-mono">
-                FOTO {activeImageIndex + 1} / {data.images.length}
+                FOTO {activeImageIndex + 1} / {galleryImages.length}
               </div>
             </div>
           </motion.div>

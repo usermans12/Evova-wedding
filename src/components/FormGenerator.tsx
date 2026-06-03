@@ -12,7 +12,7 @@ import ThemeIllustration from "./ThemeIllustration";
 
 interface FormGeneratorProps {
   data: WeddingData;
-  onChange: (newData: WeddingData) => void;
+  onChange: (newData: WeddingData, forceImmediate?: boolean) => void;
   onPreviewClick: () => void;
   
   // Multi-client and draft manager props
@@ -286,8 +286,8 @@ export default function FormGenerator({
     setIsCloudSaving(true);
     setCloudSaveSuccess(false);
 
-    // Save with the absolute newest state
-    onChange(data);
+    // Save with the absolute newest state, forcing immediate Firestore write
+    onChange(data, true);
 
     // Simulate 1.6s of robust database transaction pipeline
     setTimeout(() => {

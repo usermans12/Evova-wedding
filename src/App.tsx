@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import FormGenerator from "./components/FormGenerator";
 import WeddingInvitation from "./components/WeddingInvitation";
@@ -24,6 +24,7 @@ import {
   collection, 
   getDocs, 
   setDoc, 
+  updateDoc,
   deleteDoc, 
   onSnapshot,
   getDoc,
@@ -88,6 +89,9 @@ export default function App() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerRole, setRegisterRole] = useState<"client" | "superadmin">("client");
   
+  const syncTimeoutRef = useRef<Record<string, any>>({});
+  const [syncStatus, setSyncStatus] = useState<"Saved" | "Saving... " | "Saving...">("Saved");
+
   // App-wide state lists with safe local storage persistence
   const [clients, setClients] = useState<ClientAccount[]>([]);
   const [templates, setTemplates] = useState<TemplatePreset[]>([]);
@@ -833,11 +837,18 @@ export default function App() {
   };
 
   // Client wedding data changed via Client Admin form editing
-  const handleClientDataChange = async (clientId: string, updatedWeddingData: WeddingData) => {
+  const handleClientDataChange = async (clientId: string, updatedWeddingData: WeddingData, forceImmediate?: boolean) => {
+    // Determine names for ClientAccount root updates
+    const gNick = updatedWeddingData.groomNick || updatedWeddingData.groomName.split(" ")[0] || "";
+    const bNick = updatedWeddingData.brideNick || updatedWeddingData.brideName.split(" ")[0] || "";
+    const computedName = `${gNick} & ${bNick}`;
+
+    // 1. Instant state update for ultra-snappy and real-time live preview responsiveness
     const nextClients = clients.map(c => {
       if (c.id === clientId) {
         return {
           ...c,
+          name: computedName,
           data: updatedWeddingData
         };
       }
@@ -847,19 +858,74 @@ export default function App() {
 
     // Also update logged client session if this is the currently active client session
     if (loggedClient && loggedClient.id === clientId) {
-      setLoggedClient(prev => prev ? { ...prev, data: updatedWeddingData } : null);
+      setLoggedClient(prev => prev ? { ...prev, name: computedName, data: updatedWeddingData } : null);
     }
 
-    addLog(`CLIENT: ${clients.find(c => c.id === clientId)?.name || "N/A"}`, "Edit Wedding", "SUKSES", "Mengupdate data undangan nikah.");
+    addLog(`CLIENT: ${clients.find(c => c.id === clientId)?.name || "N/A"}`, "Edit Wedding", "SUKSES", "Mengupdate data undangan nikah lokal.");
 
-    // Update single client doc in Firestore
-    const matchedClient = nextClients.find(c => c.id === clientId);
-    if (matchedClient) {
-      try {
-        await setDoc(doc(db, "clients", clientId), matchedClient);
-      } catch (err) {
-        console.error("Gagal menyinkronkan data edit klien ke Firestore:", err);
+    // Determine changed fields specifically using dot-notation to avoid lockouts and race overwrites
+    const matchedClient = clients.find(c => c.id === clientId);
+    const oldData = matchedClient?.data;
+    const updateFields: Record<string, any> = {};
+
+    if (oldData) {
+      Object.keys(updatedWeddingData).forEach((k) => {
+        const key = k as keyof WeddingData;
+        if (JSON.stringify(oldData[key]) !== JSON.stringify(updatedWeddingData[key])) {
+          updateFields[`data.${key}`] = updatedWeddingData[key];
+        }
+      });
+    } else {
+      updateFields["data"] = updatedWeddingData;
+    }
+
+    // Force top-level client name block sync if names/titles changed
+    if (
+      updateFields["data.groomName"] !== undefined || 
+      updateFields["data.brideName"] !== undefined || 
+      updateFields["data.groomNick"] !== undefined || 
+      updateFields["data.brideNick"] !== undefined
+    ) {
+      updateFields["name"] = computedName;
+    }
+
+    // Manage Saving state
+    if (Object.keys(updateFields).length > 0) {
+      setSyncStatus("Saving...");
+    } else {
+      setSyncStatus("Saved");
+      return;
+    }
+
+    // 2. Clear any pending debounced timeout for this client
+    if (syncTimeoutRef.current[clientId]) {
+      clearTimeout(syncTimeoutRef.current[clientId]);
+    }
+
+    const performSync = async () => {
+      const currentMatchedClient = nextClients.find(c => c.id === clientId);
+      if (currentMatchedClient) {
+        try {
+          // Perform targeted update specifically to changed fields to prevent state locks or overwriting other segments
+          await updateDoc(doc(db, "clients", clientId), updateFields);
+          setSyncStatus("Saved");
+          addLog(`CLIENT: ${currentMatchedClient.name}`, "Sync Cloud", "SUKSES", "Sinkronisasi data pernikahan (terarah) ke cloud berhasil.");
+        } catch (err) {
+          console.error("Gagal menyinkronkan data edit klien ke Firestore:", err);
+          setSyncStatus("Saved");
+          addLog(`CLIENT: ${currentMatchedClient.name}`, "Sync Cloud", "GAGAL", "Gagal sinkron data otomatis ke cloud.");
+        }
       }
+    };
+
+    if (forceImmediate) {
+      // Run immediately without delays
+      await performSync();
+    } else {
+      // Debounce the firestore write by 1.5 seconds to protect request quotas and avoid out-of-order collisions
+      syncTimeoutRef.current[clientId] = setTimeout(async () => {
+        await performSync();
+      }, 1500);
     }
   };
 
@@ -1214,6 +1280,7 @@ export default function App() {
               onClientDataChange={handleClientDataChange}
               loggedClient={loggedClient}
               onLogout={handleClientLogoutAction}
+              syncStatus={syncStatus}
             />
           </div>
         </div>
