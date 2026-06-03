@@ -503,10 +503,32 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
     };
   }, [resolvedAudioUrl]);
 
-  // Separate groom (idx 0), bride (idx 1), and cover (idx 4) photos from public prewedding gallery slideshow
+  // Show groom (idx 0), bride (idx 1), and cover (idx 4) directly in the public gallery slideshow.
+  // Gallery has a minimum of 3 and a maximum of 14 photos displayed.
   const galleryImages = useMemo(() => {
-    if (!data.images || data.images.length === 0) return [];
-    return data.images.filter((_, idx) => idx !== 0 && idx !== 1 && idx !== 4);
+    if (!data.images || data.images.length === 0) {
+      return [
+        "https://lh3.googleusercontent.com/d/1eSAqduDmZGPOer-mTBhSDKwpePJjXegJ",
+        "https://lh3.googleusercontent.com/d/1zH5qr-5ADf9IzFa1KmPD5C355xd4Ek-Y",
+        "https://lh3.googleusercontent.com/d/1BEIjPrTAorLBxGorpsHkVt3HWxqHgTcI"
+      ];
+    }
+    
+    // Take all uploaded images up to 14
+    const sliceOfImages = [...data.images].slice(0, 14);
+    
+    // If fewer than 3, pad up to 3 to ensure gallery is beautifully filled
+    const fallbackList = [
+      "https://lh3.googleusercontent.com/d/1eSAqduDmZGPOer-mTBhSDKwpePJjXegJ",
+      "https://lh3.googleusercontent.com/d/1zH5qr-5ADf9IzFa1KmPD5C355xd4Ek-Y",
+      "https://lh3.googleusercontent.com/d/1BEIjPrTAorLBxGorpsHkVt3HWxqHgTcI"
+    ];
+    
+    while (sliceOfImages.length < 3) {
+      sliceOfImages.push(fallbackList[sliceOfImages.length % fallbackList.length]);
+    }
+    
+    return sliceOfImages;
   }, [data.images]);
 
   const heroImages = data.images && data.images.length > 0 
@@ -656,7 +678,7 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
       audioRef.current = audio;
     }
 
-    if (isOpen && isPlaying && audioRef.current) {
+    if (isPlaying && audioRef.current) {
       audioRef.current.play().catch(e => console.log("Audio play postponed until context interaction:", e));
     }
 
@@ -671,14 +693,14 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
   useEffect(() => {
     if (!audioRef.current) return;
     
-    if (isOpen && isPlaying) {
+    if (isPlaying) {
       audioRef.current.play().catch(e => {
         console.log("Audio play deferred to user touch/click interaction:", e);
       });
     } else {
       audioRef.current.pause();
     }
-  }, [isOpen, isPlaying]);
+  }, [isPlaying]);
 
   // iOS & Chrome Mobile specialized re-trigger playback on the first touch event after User Interaction Lock overlay is dismissed
   useEffect(() => {
@@ -719,8 +741,9 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
   // Robust interaction fallback to query and force play background music if user interacts anyway
   useEffect(() => {
     const resumeAudioOnGesture = () => {
-      if (isOpen && isPlaying && audioRef.current && audioRef.current.paused) {
-        audioRef.current.play().catch(() => {});
+      const audio = audioRef.current || hiddenAudioRef.current;
+      if (isPlaying && audio && audio.paused) {
+        audio.play().catch(() => {});
       }
     };
     window.addEventListener("click", resumeAudioOnGesture, { passive: true });
@@ -731,7 +754,7 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
       window.removeEventListener("touchstart", resumeAudioOnGesture);
       window.removeEventListener("scroll", resumeAudioOnGesture);
     };
-  }, [isOpen, isPlaying]);
+  }, [isPlaying]);
 
   const handleOpenInvitation = () => {
     setIsOpen(true);
@@ -747,6 +770,10 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
     }
     
     if (!isYouTube && !isSpotify) {
+      if (hiddenAudioRef.current) {
+        audioRef.current = hiddenAudioRef.current;
+      }
+
       if (!audioRef.current) {
         audioRef.current = new Audio(resolvedAudioUrl);
         audioRef.current.preload = "auto";
@@ -996,9 +1023,9 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
         style={{ display: "none" }}
       />
 
-      {/* USER INTERACTION LOCK OVERLAY FOR MOBILE AUTOPLAY BYPASS */}
+      {/* GLOBAL USER INTERACTION LOCK OVERLAY FOR AUTOPLAY BYPASS */}
       <AnimatePresence>
-        {isMobile && !interactionUnlocked && (
+        {!interactionUnlocked && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}

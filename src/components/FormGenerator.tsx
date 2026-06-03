@@ -511,6 +511,12 @@ export default function FormGenerator({
 
   // Image batch compression and resize to 800px width
   const handleImageFiles = async (files: FileList) => {
+    // Enforce maximum uploading / stored image count of 14 total
+    if (data.images.length + files.length > 14) {
+      alert(`Batas maksimal foto yang dapat diunggah & disimpan adalah 14 foto! Saat ini draf Anda memiliki ${data.images.length} foto, dan Anda mencoba menambahkan ${files.length} foto baru.`);
+      return;
+    }
+
     // Validate file extensions
     const allowedPhotoExts = ["jpg", "jpeg", "png", "webp"];
     for (let i = 0; i < files.length; i++) {
@@ -1704,8 +1710,10 @@ export default function FormGenerator({
                 <p className="text-sm font-semibold text-slate-700">
                   Tarik & Taruh Foto di Sini, atau <span className="text-primary-600 underline">Cari File</span>
                 </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Mendukung JPEG, PNG. Gambar akan secara otomatis dikompresi &amp; di-resize ke <b>800px</b> agar pengaksesan kilat!
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                  Mendukung JPEG, PNG. Gambar dikompresi & di-resize ke <b>800px</b> agar loading secepat kilat! <br />
+                  <span className="text-primary-600 font-bold">✓ Kapasitas Galeri: Minimal 3, Maksimal 14 foto total dapat disimpan & diunggah.</span><br />
+                  <span className="text-emerald-600 font-semibold font-mono text-[10px]">🤵 Pria, 👰 Wanita, dan 🖼️ Cover secara otomatis dimasukkan dan dapat dinikmati di dalam Galeri!</span>
                 </p>
               </div>
 
