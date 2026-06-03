@@ -43,11 +43,15 @@ export const defaultWeddingData: WeddingData = {
   groomName: "",
   groomNick: "",
   groomTitle: "",
+  groomTitleFront: "",
+  groomTitleBack: "",
   groomParents: "",
   
   brideName: "",
   brideNick: "",
   brideTitle: "",
+  brideTitleFront: "",
+  brideTitleBack: "",
   brideParents: "",
   
   weddingDate: "2026-12-31",

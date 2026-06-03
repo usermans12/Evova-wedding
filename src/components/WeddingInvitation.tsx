@@ -1406,15 +1406,9 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
                 />
 
                 <div className="relative z-10 space-y-1.5 pt-2">
-                  <h3 className="text-xl font-bold tracking-wide font-serif" style={{ color: activeTheme.headingColor }}>{data.groomName}</h3>
-                  {data.groomTitle && (
-                    <span 
-                      className="inline-block px-3 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase border"
-                      style={{ backgroundColor: softBg, color: midColor, borderColor: lightAcc }}
-                    >
-                      {data.groomTitle}
-                    </span>
-                  )}
+                  <h3 className="text-xl font-bold tracking-wide font-serif" style={{ color: activeTheme.headingColor }}>
+                    {`${data.groomTitleFront ? data.groomTitleFront.trim() + " " : ""}${data.groomName}${data.groomTitleBack ? ", " + data.groomTitleBack.trim() : (data.groomTitle ? ", " + data.groomTitle.trim() : "")}`}
+                  </h3>
                 </div>
 
                 <div className="w-8 h-px bg-slate-200 mx-auto" />
@@ -1451,15 +1445,9 @@ export default function WeddingInvitation({ data: rawData, globalToggles, client
                 />
 
                 <div className="relative z-10 space-y-1.5 pt-2">
-                  <h3 className="text-xl font-bold tracking-wide font-serif" style={{ color: activeTheme.headingColor }}>{data.brideName}</h3>
-                  {data.brideTitle && (
-                    <span 
-                      className="inline-block px-3 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase border"
-                      style={{ backgroundColor: softBg, color: midColor, borderColor: lightAcc }}
-                    >
-                      {data.brideTitle}
-                    </span>
-                  )}
+                  <h3 className="text-xl font-bold tracking-wide font-serif" style={{ color: activeTheme.headingColor }}>
+                    {`${data.brideTitleFront ? data.brideTitleFront.trim() + " " : ""}${data.brideName}${data.brideTitleBack ? ", " + data.brideTitleBack.trim() : (data.brideTitle ? ", " + data.brideTitle.trim() : "")}`}
+                  </h3>
                 </div>
 
                 <div className="w-8 h-px bg-slate-200 mx-auto" />

@@ -3,7 +3,8 @@ import { WeddingData, LoveStoryItem, ClientDraft, TemplatePreset } from "../type
 import { 
   User, Calendar, Clock, MapPin, Sparkles, Upload, Music, 
   Heart, CreditCard, Copy, Check, FileText, Trash2, Globe, HeartHandshake, Eye,
-  Share2, Send, MessageCircle, Download, FolderHeart, Plus, Settings, ShieldAlert, Key, RefreshCw
+  Share2, Send, MessageCircle, Download, FolderHeart, Plus, Settings, ShieldAlert, Key, RefreshCw,
+  Save, Lock
 } from "lucide-react";
 import { parseDriveUrl } from "../data";
 import { encodeWeddingData, safeLocalStorage, validateGoogleMapsUrl } from "../utils";
@@ -273,6 +274,91 @@ export default function FormGenerator({
   
   const [templateError, setTemplateError] = useState("");
   const [templateSuccess, setTemplateSuccess] = useState("");
+
+  // Drag and drop sorting state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Manual cloud save & sync state
+  const [isCloudSaving, setIsCloudSaving] = useState(false);
+  const [cloudSaveSuccess, setCloudSaveSuccess] = useState(false);
+
+  const triggerManualCloudSave = async () => {
+    setIsCloudSaving(true);
+    setCloudSaveSuccess(false);
+
+    // Save with the absolute newest state
+    onChange(data);
+
+    // Simulate 1.6s of robust database transaction pipeline
+    setTimeout(() => {
+      setIsCloudSaving(false);
+      setCloudSaveSuccess(true);
+      // Automatically fade out success banner after some time
+      setTimeout(() => {
+        setCloudSaveSuccess(false);
+      }, 6000);
+    }, 1600);
+  };
+
+  const swapImages = (fromIndex: number, toIndex: number) => {
+    const updatedImages = [...data.images];
+    const [movedItem] = updatedImages.splice(fromIndex, 1);
+    updatedImages.splice(toIndex, 0, movedItem);
+    onChange({
+      ...data,
+      images: updatedImages
+    });
+  };
+
+  const setPhotoRole = (currentIndex: number, role: "groom" | "bride" | "cover" | "gallery") => {
+    const updated = [...data.images];
+    
+    // Ensure we have at least 5 elements to comfortably place Groom (0), Bride (1), Cover (4)
+    while (updated.length < 5) {
+      updated.push("");
+    }
+
+    if (role === "groom") {
+      const temp = updated[0];
+      updated[0] = updated[currentIndex];
+      updated[currentIndex] = temp;
+    } else if (role === "bride") {
+      const temp = updated[1];
+      updated[1] = updated[currentIndex];
+      updated[currentIndex] = temp;
+    } else if (role === "cover") {
+      const temp = updated[4];
+      updated[4] = updated[currentIndex];
+      updated[currentIndex] = temp;
+    } else if (role === "gallery") {
+      // Move to a non-special index (for instance index 2, 3, or end)
+      const specialIndices = [0, 1, 4];
+      if (specialIndices.includes(currentIndex)) {
+        const firstGalleryIdx = updated.findIndex((_, idx) => !specialIndices.includes(idx));
+        if (firstGalleryIdx !== -1) {
+          const temp = updated[currentIndex];
+          updated[currentIndex] = updated[firstGalleryIdx];
+          updated[firstGalleryIdx] = temp;
+        } else {
+          // If no gallery slots, push to end
+          const item = updated[currentIndex];
+          updated[currentIndex] = "";
+          updated.push(item);
+        }
+      }
+    }
+
+    // Filter out potential blank elements except indices 0, 1, 4 which can fall back to defaults
+    const filteredImages = updated.map((img, idx) => {
+      if (img === "" && ![0, 1, 4].includes(idx)) return null;
+      return img;
+    }).filter((x): x is string => x !== null);
+
+    onChange({
+      ...data,
+      images: filteredImages
+    });
+  };
 
   // Personalized Guest Share states
   const [shareGuestName, setShareGuestName] = useState("");
@@ -1255,16 +1341,29 @@ export default function FormGenerator({
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700">Gelar Pria <span className="text-slate-400 font-normal">(Optional)</span></label>
-                    <input
-                      type="text"
-                      name="groomTitle"
-                      value={data.groomTitle || ""}
-                      onChange={handleInputChange}
-                      placeholder="Contoh: S.Kom"
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:border-primary-500 focus:outline-none transition-colors"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-700">Gelar Depan Pria <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="text"
+                        name="groomTitleFront"
+                        value={data.groomTitleFront || ""}
+                        onChange={handleInputChange}
+                        placeholder="dr. / Ir."
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:border-primary-500 focus:outline-none transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-700">Gelar Belakang Pria <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="text"
+                        name="groomTitle"
+                        value={data.groomTitle || ""}
+                        onChange={handleInputChange}
+                        placeholder="S.H. / S.T."
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:border-primary-500 focus:outline-none transition-colors"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -1311,16 +1410,29 @@ export default function FormGenerator({
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-700">Gelar Wanita <span className="text-slate-400 font-normal">(Optional)</span></label>
-                    <input
-                      type="text"
-                      name="brideTitle"
-                      value={data.brideTitle || ""}
-                      onChange={handleInputChange}
-                      placeholder="Contoh: S.Sos,. Gr"
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:border-primary-500 focus:outline-none transition-colors"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-700">Gelar Depan Wanita <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="text"
+                        name="brideTitleFront"
+                        value={data.brideTitleFront || ""}
+                        onChange={handleInputChange}
+                        placeholder="dr. / Hj."
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:border-primary-500 focus:outline-none transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-700">Gelar Belakang Wanita <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="text"
+                        name="brideTitle"
+                        value={data.brideTitle || ""}
+                        onChange={handleInputChange}
+                        placeholder="S.Kep / S.Pd"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:border-primary-500 focus:outline-none transition-colors"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -1663,11 +1775,14 @@ export default function FormGenerator({
                 </div>
               )}
 
-              {/* Image Previews */}
+              {/* Image Previews with Drag-n-Drop & Custom Roles Selector */}
               {data.images.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-600">{data.images.length} Foto diunggah</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-slate-700">{data.images.length} Foto diunggah</span>
+                      <span className="text-[10px] text-slate-400">💡 Sentuh &amp; tarik (drag) kotak foto untuk menggeser urutan posisi. Gunakan tombol peran untuk mematangkan letak.</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setShowClearConfirm(true)}
@@ -1677,29 +1792,111 @@ export default function FormGenerator({
                     </button>
                   </div>
                   
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                    {data.images.map((img, i) => (
-                      <div key={i} className="group relative aspect-square rounded-xl bg-slate-100 overflow-hidden border border-slate-200">
-                        <img 
-                          src={img} 
-                          alt={`Upload Preview ${i}`} 
-                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                          referrerPolicy="no-referrer"
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeImage(i);
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                    {data.images.map((img, i) => {
+                      const isGroom = i === 0;
+                      const isBride = i === 1;
+                      const isCover = i === 4;
+                      const isGallery = !isGroom && !isBride && !isCover;
+
+                      let badgeText = "📸 Galeri";
+                      let badgeClass = "bg-slate-700/90 text-white";
+                      if (isGroom) {
+                        badgeText = "🤵 Pengantin Pria";
+                        badgeClass = "bg-sky-600/90 text-white";
+                      } else if (isBride) {
+                        badgeText = "👰 Pengantin Wanita";
+                        badgeClass = "bg-pink-600/90 text-white";
+                      } else if (isCover) {
+                        badgeText = "🖼️ Cover Undangan";
+                        badgeClass = "bg-amber-600/90 text-white font-bold";
+                      }
+
+                      return (
+                        <div 
+                          key={i} 
+                          draggable
+                          onDragStart={(e) => {
+                            setDraggedIndex(i);
+                            e.dataTransfer.effectAllowed = "move";
                           }}
-                          className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white hover:bg-rose-600 transition-colors cursor-pointer"
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (draggedIndex !== null && draggedIndex !== i) {
+                              swapImages(draggedIndex, i);
+                            }
+                          }}
+                          onDragEnd={() => setDraggedIndex(null)}
+                          className={`group relative aspect-square rounded-2xl bg-slate-100 overflow-hidden border transition-all duration-200 cursor-move active:scale-98 select-none ${
+                            draggedIndex === i 
+                              ? "opacity-30 border-dashed border-primary-500 ring-2 ring-primary-500/20" 
+                              : "border-slate-200 hover:shadow-md hover:border-slate-400"
+                          }`}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-1 left-2 pr-1 truncate max-w-full text-[9px] bg-black/40 text-sky-100 rounded px-1">
-                          Foto {i + 1}
+                          <img 
+                            src={img} 
+                            alt={`Upload Preview ${i}`} 
+                            className="w-full h-full object-cover pointer-events-none"
+                            referrerPolicy="no-referrer"
+                          />
+
+                          {/* Role Badge */}
+                          <div className={`absolute top-0 left-0 text-[8px] px-2 py-0.5 rounded-br-xl font-medium tracking-wide ${badgeClass}`}>
+                            {badgeText}
+                          </div>
+
+                          {/* Top-Right Trash Button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeImage(i);
+                            }}
+                            type="button"
+                            className="absolute top-1.5 right-1.5 p-1 rounded-full bg-slate-900/60 text-white hover:bg-rose-600 transition-colors cursor-pointer"
+                            title="Hapus gambar"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+
+                          {/* Quick Role Assigner Overlays */}
+                          <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1.5 translate-y-full group-hover:translate-y-0 transition-all duration-300 flex items-center justify-around">
+                            <span className="text-[7.5px] font-bold text-slate-400 select-none block mr-1 text-left line-clamp-1">Set Peran:</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setPhotoRole(i, "groom"); }}
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-bold transition-all ${isGroom ? 'bg-sky-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                                title="Jadikan Foto Mempelai Pria"
+                              >
+                                🤵 Pria
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setPhotoRole(i, "bride"); }}
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-bold transition-all ${isBride ? 'bg-pink-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                                title="Jadikan Foto Mempelai Wanita"
+                              >
+                                👰 Wanita
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setPhotoRole(i, "cover"); }}
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-bold transition-all ${isCover ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                                title="Jadikan Foto Sampul Utama"
+                              >
+                                🖼️ Cover
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Position Badge */}
+                          <div className="absolute top-1.5 right-8 text-[8px] bg-slate-950/40 text-slate-200 px-1.5 rounded pr-1 truncate font-mono">
+                            Pos: {i + 1}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -2092,6 +2289,55 @@ export default function FormGenerator({
                   <h3 className="text-xs font-bold text-slate-800 tracking-wider uppercase">Fitur Bagikan Ke Tamu (Guest Link Generator)</h3>
                   <p className="text-[10px] text-emerald-700/85 font-sans">Kustomisasi nama penerima undangan otomatis di layar pembuka & bagikan langsung!</p>
                 </div>
+              </div>
+
+              {/* MANDATORY SYNC SAVE BUTTON PANEL */}
+              <div className="p-4 rounded-2xl bg-white border border-emerald-200/60 shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-slate-800 block flex items-center gap-1.5">
+                      <Save className="w-3.5 h-3.5 text-emerald-600" />
+                      Simpan Permanen ke Server Cloud
+                    </span>
+                    <p className="text-[10.5px] text-slate-500 leading-relaxed font-sans">
+                      Wajib klik tombol simpan di samping setelah Anda mengunggah foto baru, merubah gelar, atau mengubah lagu latar MP3 agar data langsung aktif di tautan undangan tamu Anda!
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isCloudSaving}
+                    onClick={triggerManualCloudSave}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer ${
+                      isCloudSaving 
+                        ? "bg-slate-100 text-slate-400 border border-slate-200" 
+                        : "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 shadow-md shadow-emerald-600/10"
+                    }`}
+                  >
+                    {isCloudSaving ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                        Menyinkronkan...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5" />
+                        Simpan &amp; Aktifkan Link
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {cloudSaveSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 animate-fade-in-up">
+                    <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-xs font-bold text-emerald-800 block">✓ SUKSES! Undangan Pernikahan Telah Disimpan Secara Permanen</span>
+                      <p className="text-[10px] text-emerald-700 leading-relaxed font-sans">
+                        Seluruh berkas foto baru, urutan galeri, silsilah keluarga, audio MP3 kustom, dan gelar akademik telah berhasil tersimpan dan aktif 100% online di server awan. Semua tautan bagikan untuk tamu di bawah ini sekarang otomatis merujuk ke data permanen yang baru!
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

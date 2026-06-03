@@ -3,11 +3,15 @@ export interface WeddingData {
   groomNick?: string;
   groomParents?: string;
   groomTitle?: string;
+  groomTitleFront?: string;
+  groomTitleBack?: string;
   
   brideName: string;
   brideNick?: string;
   brideParents?: string;
   brideTitle?: string;
+  brideTitleFront?: string;
+  brideTitleBack?: string;
   
   weddingDate: string; // e.g. "2026-06-11"
   weddingTimeFormat: string; // e.g. "Kamis, 11 Juni 2026"
